@@ -1,0 +1,2335 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Precession">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<!-- Apple touch icon (inline SVG → data URI) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23000'/%3E%3Ccircle cx='256' cy='256' r='180' fill='none' stroke='%23c9a84c' stroke-width='6' stroke-dasharray='12 8'/%3E%3Ccircle cx='256' cy='256' r='28' fill='%23ffe060'/%3E%3Ccircle cx='406' cy='256' r='18' fill='%232255cc'/%3E%3Ccircle cx='340' cy='148' r='8' fill='%23ccccdd'/%3E%3Cline x1='256' y1='60' x2='256' y2='452' stroke='%234488ff' stroke-width='4' stroke-dasharray='8 6'/%3E%3C/svg%3E">
+<title>Earth–Sun–Moon: Precise 3D · v29</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:100%; height:100%; background:#000; overflow:hidden; }
+#c { position:fixed; top:0; left:0; width:100%; height:100%; z-index:1; touch-action:none; }
+#ui { position:fixed; inset:0; pointer-events:none; z-index:10; }
+
+/* TOP */
+#top {
+  position:absolute; top:0; left:0; right:0;
+  background:rgba(2,4,12,0.92); border-bottom:1px solid #1e2a4a;
+  padding:6px 8px; display:flex; align-items:center; gap:5px; flex-wrap:wrap;
+  overflow:visible; z-index:200;
+  pointer-events:all;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+#top.ui-hidden { transform: translateY(-110%); opacity:0; pointer-events:none; }
+#title { color:#c9a84c; font-size:11px; font-family:'Courier New',monospace; letter-spacing:.5px; font-style:italic; white-space:nowrap; }
+button {
+  background:#080d1c; color:#e8b84b; border:1px solid #7a6230;
+  padding:5px 9px; font-size:11px; border-radius:2px; font-family:'Courier New',monospace;
+  cursor:pointer; touch-action:manipulation; user-select:none; -webkit-user-select:none;
+  -webkit-tap-highlight-color:rgba(201,168,76,0.25); white-space:nowrap;
+}
+button.on { background:rgba(201,168,76,0.16); border-color:#e8b84b; color:#ffd060; }
+.ctrl { color:#4a5878; font-size:10px; font-family:'Courier New',monospace; display:flex; align-items:center; gap:3px; white-space:nowrap; }
+.ctrl input[type=range] {
+  -webkit-appearance:none; appearance:none; width:55px; height:3px;
+  background:#181f36; border-radius:2px; outline:none; touch-action:manipulation;
+}
+.ctrl input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#c9a84c; border:1px solid #000;
+}
+.sv { color:#e8b84b; min-width:30px; }
+
+/* RIGHT INFO PANEL */
+#panel {
+  position:absolute; top:44px; right:0; width:220px;
+  background:rgba(2,4,12,0.88); border-left:1px solid #1e2a4a;
+  font-family:'Courier New',monospace; font-size:10px; color:#4a5878;
+  overflow-y:auto; max-height:calc(100% - 180px);
+  pointer-events:all;
+  transition:transform 0.22s ease;
+}
+#panel.hidden { transform:translateX(220px); }
+#panelToggle {
+  position:absolute; top:48px; right:0;
+  background:rgba(2,4,12,0.92); border-left:1px solid #1e2a4a;
+  border-bottom:1px solid #1e2a4a; border-top:1px solid #1e2a4a;
+  color:#c9a84c; font-family:'Courier New',monospace; font-size:10px;
+  padding:5px 7px; cursor:pointer; pointer-events:all;
+  touch-action:manipulation; user-select:none; -webkit-user-select:none;
+  z-index:20; letter-spacing:.5px; writing-mode:vertical-rl;
+  -webkit-tap-highlight-color:rgba(201,168,76,0.25);
+  border-radius:3px 0 0 3px;
+  transition: opacity 0.25s ease;
+}
+#panelToggle.ui-hidden { opacity:0; pointer-events:none; }
+.psec { border-bottom:1px solid #1a2240; padding:8px 10px; }
+.psec-title { color:#c9a84c; font-size:9px; letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; }
+.prow { display:flex; justify-content:space-between; margin-bottom:3px; }
+.pkey { color:#556688; }
+.pval { color:#e8b84b; text-align:right; }
+.pval.green { color:#88ff88; }
+.pval.blue  { color:#88bbff; }
+.pval.silver{ color:#ccccdd; }
+.pval.red   { color:#ff8866; }
+.pval.cyan  { color:#44ddcc; }
+.pval.white { color:#f0f0f0; }
+
+/* BOTTOM HUD */
+#hud {
+  position:absolute; bottom:0; left:0; right:0;
+  background:rgba(2,4,12,0.88); border-top:1px solid #1e2a4a;
+  padding:6px 10px max(10px, env(safe-area-inset-bottom)); display:grid;
+  grid-template-columns:repeat(4,1fr); gap:2px 8px;
+  font-family:'Courier New',monospace; font-size:10px; color:#4a5878;
+  pointer-events:none;
+  transition:right 0.22s ease, transform 0.25s ease, opacity 0.25s ease;
+}
+#hud.ui-hidden { transform: translateY(110%); opacity:0; }
+/* Always-visible date/time strip — persists even when HUD is toggled off */
+#dateBar {
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  background:rgba(2,4,12,0.92); border:1px solid #1e2a4a; border-bottom:none;
+  border-radius:6px 6px 0 0; padding:4px 14px 3px;
+  font-family:'Courier New',monospace; font-size:13px; font-weight:bold;
+  color:#ffd060; letter-spacing:.7px; white-space:nowrap;
+  pointer-events:none; z-index:50;
+  padding-bottom:max(4px, env(safe-area-inset-bottom));
+}
+.season { grid-column:1/-1; text-align:center; color:#88ff88; font-size:11px; font-style:italic; padding-bottom:3px; }
+.hv { color:#e8b84b; }
+
+/* LEGEND */
+#legend {
+  position:absolute; bottom:0; right:0; width:220px;
+  background:rgba(2,4,12,0.88); border-top:1px solid #1e2a4a; border-left:1px solid #1e2a4a;
+  padding:7px 10px; font-family:'Courier New',monospace; font-size:9.5px;
+  pointer-events:none;
+  transition:transform 0.22s ease;
+}
+#legend.hidden { transform:translateX(220px); }
+.leg-row { display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+.leg-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.leg-line { width:18px; height:2px; flex-shrink:0; }
+.leg-label { color:#6688aa; }
+
+/* ── Tour callout ─────────────────────────────────────────────────────── */
+#tourCallout {
+  position:fixed; z-index:9000; display:none;
+  background:rgba(7,17,31,0.96);
+  border:1px solid #e8b84b; border-radius:7px;
+  padding:10px 14px; max-width:240px;
+  font-family:'Courier New',monospace;
+  pointer-events:none;
+  box-shadow:0 0 18px rgba(232,184,75,0.25);
+}
+#tourArrow {
+  position:absolute; width:0; height:0;
+  border-left:7px solid transparent;
+  border-right:7px solid transparent;
+  border-top:7px solid #e8b84b;
+  bottom:-7px; left:20px;
+}
+.tc-title { color:#e8b84b; font-size:10px; font-weight:bold; letter-spacing:.5px; margin-bottom:4px; }
+.tc-desc  { color:#8aabcc; font-size:9.5px; line-height:1.6; }
+#tourNav {
+  position:fixed; z-index:9001; display:none;
+  bottom:138px; right:14px;
+  align-items:center; gap:6px;
+}
+#tourNavStep { color:#3a6080; font-family:'Courier New',monospace; font-size:9px; }
+#tourNavNext {
+  background:#1a3a5a; border:1px solid #e8b84b; color:#e8b84b;
+  font-family:'Courier New',monospace; font-size:10px;
+  padding:4px 11px; border-radius:4px; cursor:pointer;
+}
+#tourNavNext:hover { background:#2a5a8a; }
+#tourNavEnd {
+  background:none; border:1px solid #2a3a4a; color:#4a6a8a;
+  font-family:'Courier New',monospace; font-size:10px;
+  padding:4px 9px; border-radius:4px; cursor:pointer;
+}
+#tourNavEnd:hover { color:#8aabcc; }
+.tour-glow {
+  outline:2px solid #e8b84b !important;
+  border-radius:3px;
+  box-shadow:0 0 10px rgba(232,184,75,0.55) !important;
+}
+
+</style>
+</head>
+<body>
+
+
+<!-- Tour callout -->
+<div id="tourCallout"><div class="tc-title"></div><div class="tc-desc"></div><div id="tourArrow"></div></div>
+<div id="tourNav"><span id="tourNavStep"></span><button id="tourNavEnd">✕</button><button id="tourNavNext">Next →</button></div>
+
+<canvas id="c"></canvas>
+<div id="dateBar">—</div>
+<div id="ui">
+
+  <div id="top">
+    <span id="title">Earth · Sun · Moon — Precise 3D Dynamics &nbsp;<span style="color:#3a5080;font-size:10px;">v29</span></span>
+    <button id="playBtn" class="on">&#9654;</button>
+    <button id="stopBtn">&#9646;&#9646;</button>
+    <button id="rstBtn">&#8635;</button>
+    <span class="ctrl">Speed <input type="range" id="spd" min="-7" max="7" value="0" step="0.01"> <span class="sv" id="spdV">→ 1 s/s</span></span>
+    <span class="ctrl" style="gap:3px;align-items:center;">Date:
+      <input type="number" id="gotoYear" placeholder="yr (−=BCE)" style="width:72px;background:#0a0f1e;border:1px solid #1e2a4a;color:#e8b84b;font-family:'Courier New',monospace;font-size:10px;padding:2px 4px;border-radius:3px;-moz-appearance:textfield;">
+      <select id="gotoMonth" style="background:#0a0f1e;border:1px solid #1e2a4a;color:#e8b84b;font-family:'Courier New',monospace;font-size:10px;padding:2px 3px;border-radius:3px;"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select>
+      <input type="number" id="gotoDay" placeholder="d" min="1" max="31" style="width:30px;background:#0a0f1e;border:1px solid #1e2a4a;color:#e8b84b;font-family:'Courier New',monospace;font-size:10px;padding:2px 4px;border-radius:3px;-moz-appearance:textfield;">
+      <button id="gotoBtn" style="background:#0a0f1e;border:1px solid #1e2a4a;color:#e8b84b;font-family:'Courier New',monospace;font-size:10px;padding:2px 6px;border-radius:3px;cursor:pointer;">Go</button>
+    </span>
+    <button id="trailBtn" class="on">Trails</button>
+    <button id="gridBtn" class="on">Ecliptic</button>
+    <button id="annotBtn" class="on">Labels</button>
+    <button id="moonOrbitBtn" class="on">Moon Orbit</button>
+    <button id="blrBtn">🌐 My Sky</button>
+    <button id="tourBtn">🔭 Tour</button>
+
+  </div>
+
+  <div id="panelToggle" style="right:0" title="Toggle details panel">☰ Info</div>
+
+  <!-- Bengaluru Moon View Overlay -->
+  <div id="blrOverlay" style="display:none; position:absolute; top:44px; left:0; right:0; bottom:0; pointer-events:none;">
+    <!-- Top info strip -->
+    <div id="blrInfo" style="
+      position:absolute; top:0; left:0; right:0;
+      background:rgba(2,4,12,0.82); border-bottom:1px solid #1e2a4a;
+      padding:6px 12px; font-family:'Courier New',monospace; font-size:11px;
+      display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+      pointer-events:none;
+    ">
+      <span id="obsLocSpan" style="color:#c9a84c; font-size:12px; font-style:italic;">🌏 Bengaluru, India &nbsp;12.97°N 77.59°E</span>
+      <span id="blrDate" style="color:#e8b84b; font-size:12px; font-weight:bold; letter-spacing:.5px;">—</span>
+      <span style="color:#6688aa;">☀ alt/az: <span id="blrSunAlt" style="color:#ffe060;">—</span></span>
+      <span style="color:#6688aa;">🌙 alt/az: <span id="blrMoonAlt" style="color:#ccccdd;">—</span></span>
+      <span style="color:#6688aa;">Phase: <span id="blrPhase" style="color:#e8b84b;">—</span></span>
+      <span style="color:#6688aa;">Illum: <span id="blrIllum" style="color:#e8b84b;">—</span></span>
+      <span style="color:#6688aa;">Age: <span id="blrAge" style="color:#e8b84b;">—</span></span>
+      <span style="color:#6688aa;">Moon dist: <span id="blrDist" style="color:#e8b84b;">—</span></span>
+      <span style="color:#6688aa;">Angular ø: <span id="blrAngDiam" style="color:#e8b84b;">—</span></span>
+      <span id="blrEclipse" style="color:#ff6644; font-weight:bold; display:none;"></span>
+    </div>
+    <!-- Phase disc bottom-left -->
+    <div style="position:absolute; bottom:80px; left:12px; text-align:center; pointer-events:none;">
+      <canvas id="phaseDisc" width="90" height="90" style="display:block; border-radius:50%; border:1px solid #1e2a4a;"></canvas>
+      <div id="phaseLabel" style="color:#8899bb; font-family:'Courier New',monospace; font-size:9px; margin-top:4px; letter-spacing:1px;">NEW MOON</div>
+    </div>
+    <!-- Monthly calendar strip bottom -->
+    <div id="moonCalendar" style="
+      position:absolute; bottom:80px; left:120px; right:12px;
+      background:rgba(2,4,12,0.75); border:1px solid #1e2a4a; border-radius:3px;
+      padding:6px 8px; pointer-events:none;
+    ">
+      <div style="font-family:'Courier New',monospace; font-size:9px; color:#7a6230; letter-spacing:2px; text-transform:uppercase; margin-bottom:5px;">Synodic Month  29.53 days — Current Cycle</div>
+      <canvas id="monthStrip" width="600" height="36" style="width:100%; height:36px; display:block;"></canvas>
+    </div>
+  </div>
+  <div id="panel" class="hidden">
+    <!-- Sun -->
+    <div class="psec">
+      <div class="psec-title">☀ Sun (Heliocentric)</div>
+      <div class="prow"><span class="pkey">Radius</span><span class="pval white">695,700 km</span></div>
+      <div class="prow"><span class="pkey">Mass</span><span class="pval white">1.989×10³⁰ kg</span></div>
+      <div class="prow"><span class="pkey">GM☉ (TDB)</span><span class="pval white">1.32712440018×10²⁰ m³/s²</span></div>
+      <div class="prow"><span class="pkey">Spectral type</span><span class="pval white">G2V</span></div>
+    </div>
+    <!-- Earth orbit -->
+    <div class="psec">
+      <div class="psec-title">🌍 Earth Orbit (VSOP87/IAU 2006)</div>
+      <div class="prow"><span class="pkey">Semi-major axis a</span><span class="pval">1.000001018 AU</span></div>
+      <div class="prow"><span class="pkey">1 AU (IAU 2012)</span><span class="pval">149,597,870.7 km</span></div>
+      <div class="prow"><span class="pkey">Eccentricity e</span><span class="pval">0.016708634</span></div>
+      <div class="prow"><span class="pkey">Perihelion lon ϖ</span><span class="pval">102.9373°</span></div>
+      <div class="prow"><span class="pkey">Perihelion dist</span><span class="pval">147,098,291 km</span></div>
+      <div class="prow"><span class="pkey">Aphelion dist</span><span class="pval">152,097,701 km</span></div>
+      <div class="prow"><span class="pkey">Tropical year</span><span class="pval">46751/128 d = 365.2421875 d</span></div>
+      <div class="prow"><span class="pkey">Sidereal year</span><span class="pval">365.25636 d</span></div>
+      <div class="prow"><span class="pkey">Anomalistic year</span><span class="pval">365.25964 d</span></div>
+      <div class="prow"><span class="pkey">Perihelion date</span><span class="pval" id="periDate">~Jan 3</span></div>
+      <div class="prow"><span class="pkey">Earth-Sun now</span><span class="pval" id="esDist">—</span></div>
+      <div class="prow"><span class="pkey">Angular diam Sun</span><span class="pval" id="sunAngDiam">—</span></div>
+    </div>
+    <!-- Earth -->
+    <div class="psec">
+      <div class="psec-title">🌍 Earth (Physical)</div>
+      <div class="prow"><span class="pkey">Radius (equat.)</span><span class="pval blue">6,378.137 km</span></div>
+      <div class="prow"><span class="pkey">Radius (polar)</span><span class="pval blue">6,356.752 km</span></div>
+      <div class="prow"><span class="pkey">Flattening f</span><span class="pval blue">1/298.257</span></div>
+      <div class="prow"><span class="pkey">Obliquity ε J2000</span><span class="pval blue">23°26′21.406″</span></div>
+      <div class="prow"><span class="pkey">Obliquity now</span><span class="pval blue" id="epsNow">23.436°</span></div>
+      <div class="prow"><span class="pkey">ε rate (IAU2006)</span><span class="pval blue">−46.84″/cy</span></div>
+      <div class="prow"><span class="pkey">Sidereal day</span><span class="pval blue">23h 56m 04.09s</span></div>
+      <div class="prow"><span class="pkey">J₂ (oblateness)</span><span class="pval blue">1.08263×10⁻³</span></div>
+    </div>
+    <!-- Precession -->
+    <div class="psec">
+      <div class="psec-title">♈ Precession (IAU 2006 P03)</div>
+      <div class="prow"><span class="pkey">General prec. ψ̇</span><span class="pval cyan">5029.097″/cy</span></div>
+      <div class="prow"><span class="pkey">= per year</span><span class="pval cyan">50.291″/yr</span></div>
+      <div class="prow"><span class="pkey">Platonic year</span><span class="pval cyan">25,771.6 yr</span></div>
+      <div class="prow"><span class="pkey">Luni-solar prec.</span><span class="pval cyan">5038.481″/cy</span></div>
+      <div class="prow"><span class="pkey">Planetary prec.</span><span class="pval cyan">−9.384″/cy</span></div>
+      <div class="prow"><span class="pkey">ψ now</span><span class="pval cyan" id="psiNow">0.000°</span></div>
+      <div class="prow"><span class="pkey">VE longitude</span><span class="pval cyan" id="veNow">0h 00m</span></div>
+      <div class="prow"><span class="pkey">Pole star</span><span class="pval cyan" id="poleStar">Polaris</span></div>
+    </div>
+    <!-- Moon orbit -->
+    <div class="psec">
+      <div class="psec-title">🌙 Moon Orbit (ELP 2000-82)</div>
+      <div class="prow"><span class="pkey">Semi-major axis a</span><span class="pval silver">384,400 km</span></div>
+      <div class="prow"><span class="pkey">Eccentricity e</span><span class="pval silver">0.0549</span></div>
+      <div class="prow"><span class="pkey">Inclination i</span><span class="pval silver">5.145° to ecliptic</span></div>
+      <div class="prow"><span class="pkey">Sidereal period</span><span class="pval silver">27.321661 d</span></div>
+      <div class="prow"><span class="pkey">Synodic period</span><span class="pval silver">29.530589 d</span></div>
+      <div class="prow"><span class="pkey">Draconic period</span><span class="pval silver">27.212221 d</span></div>
+      <div class="prow"><span class="pkey">Anomalistic period</span><span class="pval silver">27.55 d</span></div>
+      <div class="prow"><span class="pkey">Node precession</span><span class="pval silver">−19.355°/yr</span></div>
+      <div class="prow"><span class="pkey">Node period</span><span class="pval silver">18.6129 yr</span></div>
+      <div class="prow"><span class="pkey">Apse precession</span><span class="pval silver">+40.690°/yr</span></div>
+      <div class="prow"><span class="pkey">Apse period</span><span class="pval silver">8.8505 yr</span></div>
+      <div class="prow"><span class="pkey">Saros cycle</span><span class="pval silver">18.03 yr</span></div>
+      <div class="prow"><span class="pkey">Metonic cycle</span><span class="pval silver">19 yr / 235 mon</span></div>
+      <div class="prow"><span class="pkey">Earth-Moon now</span><span class="pval silver" id="emDist">—</span></div>
+      <div class="prow"><span class="pkey">Angular diam Moon</span><span class="pval silver" id="moonAngDiam">—</span></div>
+    </div>
+    <!-- Moon physical -->
+    <div class="psec">
+      <div class="psec-title">🌙 Moon (Physical)</div>
+      <div class="prow"><span class="pkey">Radius (mean)</span><span class="pval silver">1,737.4 km</span></div>
+      <div class="prow"><span class="pkey">Mass</span><span class="pval silver">7.342×10²² kg</span></div>
+      <div class="prow"><span class="pkey">GM☾</span><span class="pval silver">4.9048×10¹² m³/s²</span></div>
+      <div class="prow"><span class="pkey">Moon/Earth mass</span><span class="pval silver">1/81.3</span></div>
+      <div class="prow"><span class="pkey">Phase</span><span class="pval silver" id="moonPhase">New Moon</span></div>
+      <div class="prow"><span class="pkey">Age in cycle</span><span class="pval silver" id="moonAge">0.0 d</span></div>
+    </div>
+    <!-- Cycles -->
+    <div class="psec">
+      <div class="psec-title">⏱ Key Cycles</div>
+      <div class="prow"><span class="pkey">Eclipse season</span><span class="pval red">173.3 d</span></div>
+      <div class="prow"><span class="pkey">Saros (eclipse)</span><span class="pval red">6585.32 d</span></div>
+      <div class="prow"><span class="pkey">Inex period</span><span class="pval red">10,571.95 d</span></div>
+      <div class="prow"><span class="pkey">Metonic (lunisolar)</span><span class="pval red">6939.69 d</span></div>
+      <div class="prow"><span class="pkey">Callippic</span><span class="pval red">4×Metonic−1d</span></div>
+      <div class="prow"><span class="pkey">Obliquity range</span><span class="pval red">22.1°–24.5°</span></div>
+      <div class="prow"><span class="pkey">Obliquity period</span><span class="pval red">~41,000 yr</span></div>
+      <div class="prow"><span class="pkey">Eccentricity period</span><span class="pval red">~100,000 yr</span></div>
+    </div>
+  </div><!-- /panel -->
+
+  <div id="hud">
+    <div class="season" id="sBadge">Vernal Equinox</div>
+    <div style="grid-column:1/-1;text-align:center;color:#ffd060;font-size:13px;font-weight:bold;letter-spacing:.8px;padding-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="hDate">1 Jan 2000  12:00:00 UTC</div>
+    <div>Year <span class="hv" id="hYr">+2000.0</span></div>
+    <div>Ecl. lon λ☉ <span class="hv" id="hLon">0.0°</span></div>
+    <div>Julian Day <span class="hv" id="hJD">2451545.0</span></div>
+    <div>Days elapsed <span class="hv" id="hDays">0</span></div>
+    <div>Earth r <span class="hv" id="hR">1.000 AU</span></div>
+    <div>Moon r <span class="hv" id="hMR">384,400 km</span> <span class="hv" id="hMoonAng" style="color:#aac8ff;"></span> <span id="hMoonApex" style="font-size:9px;font-weight:bold;letter-spacing:0.5px;"></span></div>
+    <div>Synodic months · Kali Yuga (18 Feb 3102 BCE) <span class="hv" id="hFMCount" style="color:#ffe090;">0</span></div>
+    <div>KY days / weeks <span class="hv" id="hKYDays" style="color:#ffcc88;">0</span></div>
+    <div>Node Ω <span class="hv" id="hNode">125.04°</span></div>
+    <div>Apse ω <span class="hv" id="hApse">318.30°</span></div>
+    <div>☿ Mercury r <span class="hv" id="hMercR">—</span></div>
+    <div style="color:#ffcc44;">GR ☿ precession <span class="hv" id="hMercGR" style="color:#ffdd66;">43.0″/cy</span></div>
+    <div id="hGRDefl" style="display:none;grid-column:1/-1;text-align:center;color:#88ffcc;font-size:11px;padding-top:2px;"></div>
+  </div>
+
+  <div id="legend" class="hidden">
+    <div class="leg-row"><div class="leg-dot" style="background:#ffe060"></div><span class="leg-label">Sun (focus of orbit)</span></div>
+    <div class="leg-row"><div class="leg-dot" style="background:#4488ee"></div><span class="leg-label">Earth</span></div>
+    <div class="leg-row"><div class="leg-dot" style="background:#ccccdd"></div><span class="leg-label">Moon</span></div>
+    <div class="leg-row"><div class="leg-dot" style="background:#ffd060"></div><span class="leg-label">North Celestial Pole (NCP)</span></div>
+    <div class="leg-row"><div class="leg-line" style="background:#88ff88"></div><span class="leg-label">Vernal Equinox direction</span></div>
+    <div class="leg-row"><div class="leg-line" style="background:#ff8844"></div><span class="leg-label">Moon ascending node</span></div>
+    <div class="leg-row"><div class="leg-line" style="background:#4488ff"></div><span class="leg-label">Earth spin axis (NCP→SCP)</span></div>
+    <div class="leg-row"><div class="leg-line" style="background:#c9a84c"></div><span class="leg-label">NCP precession trail</span></div>
+    <div class="leg-row"><div class="leg-line" style="background:#446688; height:1px"></div><span class="leg-label">Ecliptic plane</span></div>
+  </div>
+
+</div><!-- /ui -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════════════════
+// PRECISE CONSTANTS  (IAU 2012 / IAU 2006 / VSOP87 / ELP 2000-82)
+// ═══════════════════════════════════════════════════════════════════════════
+var TWO_PI = Math.PI * 2;
+var DEG    = Math.PI / 180;
+var AS2R   = DEG / 3600;          // arcseconds → radians
+
+// ── Earth orbital elements at J2000.0 (VSOP87 mean elements) ─────────────
+var EARTH = {
+  a:    1.000001018,               // AU semi-major axis
+  e0:   0.016708634,               // eccentricity J2000
+  eDot: -0.000042037,              // de/dy (per year, secular term)
+  // longitude of perihelion from VE, J2000
+  varpi0: 102.93735 * DEG,
+  varpiDot: 1.71946e-4 * DEG,     // rad/yr (apsidal precession)
+  // tropical year: 46751 days of 86400 s in 128 years → exact fraction
+  Ty:   46751/128,   // = 365.2421875 d
+  // sidereal year
+  Tsid: 365.256364,             // user-specified sidereal year
+  R_eq: 6378.137,                  // km equatorial radius
+  R_pol:6356.752,                  // km polar radius
+};
+
+// ── Sun physical ──────────────────────────────────────────────────────────
+var SUN_RADIUS_KM = 695700.0;      // IAU 2015
+
+// ── IAU 2006 General Precession (Lieske/Capitaine P03) ───────────────────
+// ψ_A = p0·T + p1·T² + ... (arcsec, T in Julian centuries from J2000)
+var PREC = {
+  p0:  5029.097,                   // arcsec/cy — general precession in longitude
+  p1:  1.5573,                     // arcsec/cy²
+  p2:  0.00018,                    // arcsec/cy³ (negligible but included)
+  eps0: 84381.406,                 // arcsec, obliquity at J2000 = 23°26'21.406"
+  epsD: -46.836769,                // arcsec/cy
+  epsD2: -0.00018,                 // arcsec/cy²
+  period: 25771.6,                 // years (Platonic year)
+};
+
+// ── Moon orbital elements J2000.0 (ELP 2000-82 / Chapront) ───────────────
+var MOON = {
+  a:    384400.0,                  // km mean semi-major axis
+  e0:   0.0549,                    // mean eccentricity
+  i:    5.145 * DEG,               // inclination to ecliptic (rad)
+  // Sidereal mean motion n (rad/day)
+  n:    TWO_PI / 27.321661,
+  // Periods (days)
+  Tsid: 27.321661,                 // sidereal
+  Tsyn: 29.530589,                 // synodic
+  Tdra: 27.212221,                 // draconic (nodal)
+  Tano: 27.55,                     // anomalistic (anchored to Dec 26 2045 14:49 UTC perigee)
+  // Secular rates (rad/day, from ELP 2000-82)
+  // Ascending node Ω precesses retrograde:
+  nodeDot: -(TWO_PI / (18.6129 * 365.25)),   // rad/day, retrograde
+  // Argument of perigee ω precesses prograde:
+  apseDot:  (TWO_PI / (8.8505 * 365.25)),    // rad/day, prograde
+  // J2000 epoch values (Chapront et al. 2002):
+  Omega0:   125.0445479 * DEG,     // ascending node longitude at J2000
+  omega0:   318.3082163 * DEG,     // argument of perigee at J2000
+  M0:       134.9633964 * DEG,     // mean anomaly at J2000
+  L0:       218.3165715 * DEG,     // mean longitude at J2000
+  R_mean:   1737.4,                // km mean radius
+};
+
+// ── Mercury orbital elements at J2000.0 (VSOP87 mean) ────────────────────
+var MERCURY = {
+  a:    0.38709893,                // AU semi-major axis
+  e:    0.20563069,                // eccentricity
+  i:    7.00487  * DEG,            // inclination to ecliptic
+  Omega:48.33167 * DEG,            // longitude of ascending node
+  omega:29.12478 * DEG,            // argument of perihelion (in orbit plane)
+  M0:  174.7948  * DEG,            // mean anomaly at J2000 (= L0 − Ω − ω)
+  Ty:   87.96926,                  // sidereal period (days)
+  R_km: 2439.7,                    // mean radius km
+  // GR extra apsidal precession: 43.0 arcsec/century (beyond Newtonian)
+  // δω = 24π³a² / (T²c²(1−e²)) — Einstein 1915
+  omegaDot_GR: 43.0 * AS2R / 36524.25,  // rad/day
+};
+
+// ── GR light-deflection constant (Einstein 1915) ──────────────────────────
+// δα = 4GM☉/(c²·b) = GR_LIMB × (R☉_angular / θ) at angular sep θ from Sun
+// At Sun's limb: δα = 4GM☉/(c²R☉) = 1.7508 arcsec
+var GR_LIMB_RAD = 4 * 1.32712440018e20 / (8.98755179e16 * 695700e3); // 8.491e-6 rad = 1.752"
+
+// ── Named star catalog (J2000 ecliptic λ°, β°, Vmag, name) ───────────────
+// Curated: bright stars + Hyades (key for 1919 eclipse) near ecliptic
+var STARS = [
+  // Hyades cluster — critical for 1919 Einstein eclipse (Sun at λ≈68° in May)
+  [69.9, -5.5, 0.85,'Aldebaran'],   // α Tau
+  [66.2,  4.5, 3.65,'γ Tau'],
+  [68.1,  3.5, 3.76,'δ Tau'],
+  [70.7,  5.0, 3.53,'ε Tau'],
+  [65.8, -2.5, 3.84,'θ¹ Tau'],
+  [72.3,  8.5, 4.23,'κ¹ Tau'],
+  // Orion region
+  [88.8,-16.0, 0.50,'Betelgeuse'],  // α Ori
+  [78.6,-31.1, 0.12,'Rigel'],       // β Ori
+  [81.0,-20.0, 1.64,'Bellatrix'],   // γ Ori
+  [84.4,-24.0, 1.70,'Alnilam'],     // ε Ori
+  [84.1,-25.1, 1.74,'Alnitak'],     // ζ Ori
+  [81.2,  5.2, 1.65,'Elnath'],      // β Tau
+  // Taurus / Pleiades
+  [54.3, 22.4, 1.79,'Alcyone'],     // η Tau (Pleiades)
+  [51.1, 16.2, 1.79,'Mirfak'],      // α Per
+  // Gemini
+  [113.5,  6.7, 1.14,'Pollux'],     // β Gem
+  [113.8, 10.1, 1.58,'Castor'],     // α Gem
+  // Leo
+  [149.7,  0.5, 1.35,'Regulus'],    // α Leo
+  [177.3, 14.2, 2.14,'Denebola'],   // β Leo
+  // Virgo
+  [203.7, -2.1, 1.04,'Spica'],      // α Vir
+  // Scorpius
+  [249.9, -4.6, 1.09,'Antares'],    // α Sco
+  // Sagittarius
+  [276.0, -5.9, 1.85,'Kaus Aus.'],  // ε Sgr
+  // Aquarius / Capricorn
+  [307.0,-15.0, 2.88,'Sadalsuud'],  // β Aqr
+  // Aries
+  [31.8,  9.7, 2.00,'Hamal'],       // α Ari
+  // Bright stars off-ecliptic (visible during eclipses for reference)
+  [104.1,-39.6,-1.46,'Sirius'],     // α CMa
+  [113.9,-16.0, 0.34,'Procyon'],    // α CMi
+  [79.2, 22.9, 0.08,'Capella'],     // α Aur
+  [176.2, 30.7,-0.05,'Arcturus'],   // α Boo
+  [279.2, 61.7, 0.03,'Vega'],       // α Lyr
+  [307.3, 29.3, 0.77,'Altair'],     // α Aql
+  [330.3, 59.5, 1.25,'Deneb'],      // α Cyg
+  [15.9,-59.2, 0.46,'Achernar'],    // α Eri
+  [221.8,-42.6,-0.01,'Rig. Kent.'], // α Cen
+  [212.5,-43.1, 0.61,'Hadar'],      // β Cen
+  [337.0,-21.1, 1.16,'Fomalhaut'],  // α PsA
+  [96.0,-75.7,-0.72,'Canopus'],     // α Car
+];
+
+// ─── Derived: distance ratios for display ────────────────────────────────
+var AU_KM = 149597870.7;           // IAU 2012 definition
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCENE SCALE
+// All orbital distances scaled logarithmically for visibility.
+// Earth orbit: 6 scene units = 1 AU
+// Moon orbit: 2.2 scene units (actual ratio 384400/149597870 ≈ 0.00257 AU — too small)
+// ═══════════════════════════════════════════════════════════════════════════
+var AU_SC   = 6.0;                 // scene units per AU
+var MOON_SC = 2.2;                 // scene units for Moon orbit radius (exaggerated for visibility)
+var SUN_R   = 0.55;                // scene radius of Sun
+var EARTH_R = 0.22;                // scene radius of Earth
+var MOON_R  = 0.10;                // scene radius of Moon (actual/Earth ≈ 0.272 — preserved here)
+var PREC_R  = 7.0;                 // scene radius of precession trace sphere
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KEPLER SOLVER
+// ═══════════════════════════════════════════════════════════════════════════
+function solveKepler(M, e) {
+  M = ((M % TWO_PI) + TWO_PI) % TWO_PI;
+  var E = M + e * Math.sin(M) * (1 + e * Math.cos(M)); // first approx
+  for (var i = 0; i < 15; i++) {
+    var dE = (M - E + e * Math.sin(E)) / (1 - e * Math.cos(E));
+    E += dE;
+    if (Math.abs(dE) < 1e-12) break;
+  }
+  return E;
+}
+function trueAnom(M, e) {
+  var E = solveKepler(M, e);
+  return 2 * Math.atan2(Math.sqrt(1+e)*Math.sin(E/2), Math.sqrt(1-e)*Math.cos(E/2));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRECESSION
+// ═══════════════════════════════════════════════════════════════════════════
+function getPsiRad(days) {        // precession in longitude (rad) — from T_sid and T_trop only
+  // ψ = days × 2π × (T_sid − T_trop) / (T_sid × T_trop)
+  // rate ≈ 50.30 arcsec/yr, platonic year ≈ 25765 tropical years
+  return days * TWO_PI * (EARTH.Tsid - EARTH.Ty) / (EARTH.Tsid * EARTH.Ty);
+}
+function getEpsRad(Tyr) {         // obliquity of ecliptic (rad)
+  var T = Tyr / 100.0;
+  return (PREC.eps0 + PREC.epsD*T + PREC.epsD2*T*T) * AS2R;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POLE STARS (closest approach epoch, IAU catalogue RA/Dec J2000)
+// ═══════════════════════════════════════════════════════════════════════════
+var POLE_STARS = [
+  { name:'Polaris (α UMi)',  yr:2100,    dec:89.264 },
+  { name:'Thuban (α Dra)',   yr:-2830,   dec:64.38  },
+  { name:'Kochab (β UMi)',   yr:-1100,   dec:74.16  },
+  { name:'Alrai (γ Cep)',    yr:4200,    dec:77.63  },
+  { name:'Iota Her',         yr:7400,    dec:46.01  },
+  { name:'Deneb (α Cyg)',    yr:9830,    dec:45.28  },
+  { name:'Vega (α Lyr)',     yr:13727,   dec:38.78  },
+];
+function nearestStar(eyr) {
+  var yr = 2000+eyr, best=POLE_STARS[0], bd=1e12;
+  for (var i=0;i<POLE_STARS.length;i++) {
+    var d=Math.abs(POLE_STARS[i].yr-yr); if(d<bd){bd=d;best=POLE_STARS[i];}
+  }
+  return best.name;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MOON PHASE NAME
+// ═══════════════════════════════════════════════════════════════════════════
+function moonPhase(elongDeg) {
+  var d = ((elongDeg % 360) + 360) % 360;
+  if (d < 11.25 || d >= 348.75) return 'New Moon';
+  if (d < 56.25)  return 'Waxing Crescent';
+  if (d < 101.25) return 'First Quarter';
+  if (d < 146.25) return 'Waxing Gibbous';
+  if (d < 191.25) return 'Full Moon';
+  if (d < 236.25) return 'Waning Gibbous';
+  if (d < 281.25) return 'Last Quarter';
+  return 'Waning Crescent';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SEASON
+// ═══════════════════════════════════════════════════════════════════════════
+function getSeason(d) {
+  d = ((d%360)+360)%360;
+  if (d<4||d>=356)  return 'Vernal Equinox — Sun at 0h RA, crosses equator northward (λ☉=0°)';
+  if (d<86)         return 'Northern Spring (λ☉ = 0°→90°)';
+  if (d<94)         return 'Summer Solstice — Sun at max northern declination +ε (λ☉=90°)';
+  if (d<176)        return 'Northern Summer (λ☉ = 90°→180°)';
+  if (d<184)        return 'Autumnal Equinox — Sun crosses equator southward (λ☉=180°)';
+  if (d<266)        return 'Northern Autumn (λ☉ = 180°→270°)';
+  if (d<274)        return 'Winter Solstice — Sun at max southern declination −ε (λ☉=270°)';
+  return 'Northern Winter (λ☉ = 270°→360°)';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THREE.JS SETUP
+// ═══════════════════════════════════════════════════════════════════════════
+var canvas = document.getElementById('c');
+var renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = false;
+
+var scene  = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.001, 3000);
+
+window.addEventListener('resize', function(){
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// ── Lighting: single point light AT the Sun (origin), tiny ambient for dark-side visibility ──
+// Sun emits light from origin — Earth and Moon are lit/shadowed correctly
+var sunLight = new THREE.PointLight(0xfff8e0, 3.0, 500);
+sunLight.position.set(0, 0, 0);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width  = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.1;
+sunLight.shadow.camera.far  = 300;
+scene.add(sunLight);
+// Very dim ambient so dark side isn't pitch black (earthshine / zodiacal light proxy)
+var ambLight = new THREE.AmbientLight(0x08101e, 1.0);
+scene.add(ambLight);
+// Secondary fill from Earth's earthshine on Moon (approximated as very faint blue point near Earth)
+var earthshineLight = new THREE.PointLight(0x1a3a6a, 0.15, 8);
+scene.add(earthshineLight); // position updated each frame to Earth's location
+
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+// ── Starfield ─────────────────────────────────────────────────────────────
+(function(){
+  var verts=[], cols=[];
+  for(var i=0;i<4000;i++){
+    var th=Math.random()*TWO_PI, ph=Math.acos(2*Math.random()-1), r=1000;
+    verts.push(r*Math.sin(ph)*Math.cos(th), r*Math.sin(ph)*Math.sin(th), r*Math.cos(ph));
+    var b=0.3+0.7*Math.random(), g=b-0.05*Math.random(), rb=b-0.1*Math.random();
+    cols.push(Math.min(1,rb+0.1), Math.min(1,g), Math.min(1,b+0.05));
+  }
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({size:0.55,vertexColors:true,sizeAttenuation:false})));
+})();
+
+// ── Sun ───────────────────────────────────────────────────────────────────
+var sunMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(SUN_R,48,48),
+  new THREE.MeshBasicMaterial({color:0xfff080})
+);
+scene.add(sunMesh);
+// Corona glow ring
+var coronaGeo = new THREE.RingGeometry(SUN_R*1.05, SUN_R*1.5, 64);
+var coronaMat = new THREE.MeshBasicMaterial({color:0xffe040, transparent:true, opacity:0.12, side:THREE.DoubleSide});
+scene.add(new THREE.Mesh(coronaGeo, coronaMat));
+
+// ── Ecliptic plane ────────────────────────────────────────────────────────
+var eclipGroup = new THREE.Group();
+scene.add(eclipGroup);
+// faint disc
+eclipGroup.add(new THREE.Mesh(
+  new THREE.CircleGeometry(AU_SC*1.7,128),
+  new THREE.MeshBasicMaterial({color:0x081830,transparent:true,opacity:0.13,side:THREE.DoubleSide})
+));
+// rim
+eclipGroup.add(new THREE.Mesh(
+  new THREE.RingGeometry(AU_SC*1.68, AU_SC*1.72, 128),
+  new THREE.MeshBasicMaterial({color:0x1a3060,side:THREE.DoubleSide})
+));
+// ecliptic pole axis
+var epAxis=[new THREE.Vector3(0,-12,0),new THREE.Vector3(0,12,0)];
+eclipGroup.add(new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(epAxis),
+  new THREE.LineBasicMaterial({color:0x1a3066,transparent:true,opacity:0.5})
+));
+// cardinal direction dashes (VE, SS, AE, WS) in ecliptic plane
+var SCOLORS=[0x88ff88,0xffdd44,0xff8844,0x88ccff];
+var SNAMES =['VE (γ)','SS (+ε)','AE (☋)','WS (−ε)'];
+for(var s=0;s<4;s++){
+  var sa=s*Math.PI/2;
+  var sp=[new THREE.Vector3(0,0,0),
+          new THREE.Vector3(AU_SC*1.68*Math.cos(sa),0,-AU_SC*1.68*Math.sin(sa))];
+  eclipGroup.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(sp),
+    new THREE.LineBasicMaterial({color:SCOLORS[s],transparent:true,opacity:0.18})
+  ));
+}
+
+// ── Earth orbit ellipse (fixed in ecliptic, perihelion along local +X before rotation) ─
+var ORB_A=AU_SC, ORB_E=EARTH.e0;
+var ORB_B=ORB_A*Math.sqrt(1-ORB_E*ORB_E), ORB_C=ORB_A*ORB_E;
+var orbPts=[];
+for(var i=0;i<=360;i++){
+  var t=(i/360)*TWO_PI;
+  orbPts.push(new THREE.Vector3(ORB_A*Math.cos(t)-ORB_C, 0, ORB_B*Math.sin(t)));
+}
+var orbitGroup=new THREE.Group();
+orbitGroup.rotation.y = -EARTH.varpi0; // rotate so perihelion aligns with correct ecliptic direction
+orbitGroup.add(new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(orbPts),
+  new THREE.LineBasicMaterial({color:0x6a5220,transparent:true,opacity:0.5})
+));
+// Perihelion marker
+var periDot=new THREE.Mesh(new THREE.SphereGeometry(0.07,8,8),
+  new THREE.MeshBasicMaterial({color:0xff4400}));
+periDot.position.set(ORB_A*(1-ORB_E)-ORB_C,0,0); // at t=0 → x = a-c = a(1-e)
+orbitGroup.add(periDot);
+scene.add(orbitGroup);
+
+// ── Season markers (co-rotate with VE direction) ──────────────────────────
+var seasonGroup = new THREE.Group();
+scene.add(seasonGroup);
+for(var s=0;s<4;s++){
+  var sa=s*Math.PI/2;
+  var sm=new THREE.Mesh(new THREE.SphereGeometry(0.1,12,12),
+    new THREE.MeshBasicMaterial({color:SCOLORS[s]}));
+  sm.position.set(AU_SC*Math.cos(sa),0,-AU_SC*Math.sin(sa));
+  seasonGroup.add(sm);
+  // radial line
+  var sp=[new THREE.Vector3(0,0,0),sm.position.clone()];
+  seasonGroup.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(sp),
+    new THREE.LineBasicMaterial({color:SCOLORS[s],transparent:true,opacity:0.25})
+  ));
+}
+
+// ── VE direction line ─────────────────────────────────────────────────────
+var veLineGeo = new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(0,0,0), new THREE.Vector3(AU_SC*1.72,0,0)
+]);
+var veLine = new THREE.Line(veLineGeo,
+  new THREE.LineBasicMaterial({color:0x88ff88,transparent:true,opacity:0.65}));
+scene.add(veLine);
+
+// ── Precession circle (NCP trace) ─────────────────────────────────────────
+var EPS_J2 = PREC.eps0 * AS2R;
+var precCircPts=[];
+for(var i=0;i<=256;i++){
+  var a=(i/256)*TWO_PI;
+  precCircPts.push(new THREE.Vector3(
+    PREC_R*Math.sin(EPS_J2)*Math.cos(a),
+    PREC_R*Math.cos(EPS_J2),
+    PREC_R*Math.sin(EPS_J2)*Math.sin(a)
+  ));
+}
+scene.add(new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(precCircPts),
+  new THREE.LineBasicMaterial({color:0x7a6230,transparent:true,opacity:0.45})
+));
+
+// NCP marker
+var ncpMesh=new THREE.Mesh(new THREE.SphereGeometry(0.13,12,12),
+  new THREE.MeshBasicMaterial({color:0xffd060}));
+scene.add(ncpMesh);
+
+// Pole axis line (origin → NCP)
+var poleAxisGeo=new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(0,0,0),new THREE.Vector3(0,PREC_R*1.08,0)
+]);
+var poleAxisLine=new THREE.Line(poleAxisGeo,
+  new THREE.LineBasicMaterial({color:0xffd060,transparent:true,opacity:0.28}));
+scene.add(poleAxisLine);
+
+// NCP trail
+var TRAIL_MAX=1000;
+var trailBuf=[]; for(var i=0;i<TRAIL_MAX;i++) trailBuf.push(new THREE.Vector3());
+var trailGeo=new THREE.BufferGeometry().setFromPoints(trailBuf);
+var trailLine=new THREE.Line(trailGeo,
+  new THREE.LineBasicMaterial({color:0xc9a84c,transparent:true,opacity:0.5}));
+scene.add(trailLine);
+var trailIdx=0, trailCount=0, showTrail=true;
+
+// ── Earth group ───────────────────────────────────────────────────────────
+var earthGroup = new THREE.Group();
+scene.add(earthGroup);
+
+// Globe — Phong with shadow cast+receive
+var earthMat = new THREE.MeshPhongMaterial({
+  color: 0x2255cc, emissive: 0x000814, shininess: 40,
+  specular: 0x224488
+});
+var earthMesh = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R,64,64), earthMat);
+earthMesh.castShadow = true;
+earthMesh.receiveShadow = true;
+earthGroup.add(earthMesh);
+
+// Rotation marker: bright spike at equator (0° lat, 0° lon = Greenwich)
+// Sits on earthMesh so it rotates with daily spin
+var markerGroup = new THREE.Group();
+earthMesh.add(markerGroup);
+// Spike pointing outward along +X (equator, prime meridian)
+var spikeMat = new THREE.MeshBasicMaterial({color:0xff4400});
+var spikeMesh = new THREE.Mesh(
+  new THREE.ConeGeometry(0.018, 0.10, 8),
+  spikeMat
+);
+// Cone points along +Y by default; rotate to point along +X
+spikeMesh.rotation.z = -Math.PI/2;
+spikeMesh.position.set(EARTH_R + 0.05, 0, 0);
+markerGroup.add(spikeMesh);
+// Small base dot on surface
+var markerDot = new THREE.Mesh(
+  new THREE.SphereGeometry(0.022, 8, 8),
+  new THREE.MeshBasicMaterial({color:0xff6622})
+);
+markerDot.position.set(EARTH_R, 0, 0);
+markerGroup.add(markerDot);
+// Thin line from centre to spike (shows rotation clearly)
+var markerLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0,0,0),
+    new THREE.Vector3(EARTH_R*1.5,0,0)
+  ]),
+  new THREE.LineBasicMaterial({color:0xff4400, transparent:true, opacity:0.6})
+);
+markerGroup.add(markerLine);
+
+// Spin axis line (through Earth, local +Y = NCP direction)
+var eAxisLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0,-EARTH_R*2.6,0), new THREE.Vector3(0,EARTH_R*2.6,0)
+  ]),
+  new THREE.LineBasicMaterial({color:0x4488ff})
+);
+earthGroup.add(eAxisLine);
+
+// N pole dot
+var nPoleDot=new THREE.Mesh(new THREE.SphereGeometry(0.045,8,8),
+  new THREE.MeshBasicMaterial({color:0xaaccff}));
+nPoleDot.position.set(0,EARTH_R*2.6,0);
+earthGroup.add(nPoleDot);
+
+// S pole dot
+var sPoleDot=new THREE.Mesh(new THREE.SphereGeometry(0.045,8,8),
+  new THREE.MeshBasicMaterial({color:0x6699aa}));
+sPoleDot.position.set(0,-EARTH_R*2.6,0);
+earthGroup.add(sPoleDot);
+
+// Celestial equator ring (perpendicular to spin axis)
+var ceqMesh=new THREE.Mesh(
+  new THREE.RingGeometry(EARTH_R*1.35,EARTH_R*1.44,64),
+  new THREE.MeshBasicMaterial({color:0x4466cc,side:THREE.DoubleSide,transparent:true,opacity:0.5})
+);
+earthGroup.add(ceqMesh);
+
+// Equatorial plane (large disc, tilted with Earth)
+var eqPlane=new THREE.Mesh(
+  new THREE.CircleGeometry(AU_SC*1.4,64),
+  new THREE.MeshBasicMaterial({color:0x0a1840,transparent:true,opacity:0.07,side:THREE.DoubleSide})
+);
+scene.add(eqPlane);
+
+// ── Sun-Earth line ─────────────────────────────────────────────────────────
+var seLineGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(1,0,0)]);
+var seLine=new THREE.Line(seLineGeo,new THREE.LineBasicMaterial({color:0xffe060,transparent:true,opacity:0.14}));
+scene.add(seLine);
+
+// ── Moon orbit (relative to Earth) ───────────────────────────────────────
+// Moon orbit drawn in a group that moves with Earth and tilts with node/inclination
+var moonOrbitGroup = new THREE.Group(); // child of earthGroup world-space equivalent
+scene.add(moonOrbitGroup);
+
+// Moon orbit ellipse (scaled, centred on Earth)
+var MOON_E = MOON.e0;
+var MOON_A = MOON_SC, MOON_B=MOON_A*Math.sqrt(1-MOON_E*MOON_E), MOON_C_OFF=MOON_A*MOON_E;
+var moonOrbitPts=[];
+for(var i=0;i<=256;i++){
+  var t=(i/256)*TWO_PI;
+  moonOrbitPts.push(new THREE.Vector3(MOON_A*Math.cos(t)-MOON_C_OFF, 0, MOON_B*Math.sin(t)));
+}
+var moonOrbitLine=new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(moonOrbitPts),
+  new THREE.LineBasicMaterial({color:0x445566,transparent:true,opacity:0.55})
+);
+moonOrbitGroup.add(moonOrbitLine);
+
+// Node line (ascending node direction)
+var nodeLineGeo=new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(-MOON_SC*1.3,0,0), new THREE.Vector3(MOON_SC*1.3,0,0)
+]);
+var nodeLine=new THREE.Line(nodeLineGeo,
+  new THREE.LineBasicMaterial({color:0xff8844,transparent:true,opacity:0.6}));
+moonOrbitGroup.add(nodeLine);
+
+// ── Moon ─────────────────────────────────────────────────────────────────
+var moonMat = new THREE.MeshPhongMaterial({
+  color: 0xaaaacc, emissive: 0x080810, shininess: 5,
+  specular: 0x111122
+});
+var moonMesh = new THREE.Mesh(new THREE.SphereGeometry(MOON_R,32,32), moonMat);
+moonMesh.castShadow    = true;
+moonMesh.receiveShadow = true;
+scene.add(moonMesh);
+
+// Moon umbra shadow cone (Earth's shadow projected to Moon — lunar eclipse)
+// Umbra cone: tip at Earth antumbra point, base at Earth
+// Rendered as dark semi-transparent cone along Sun-Earth axis
+var umbraGeo = new THREE.ConeGeometry(0.01, 1, 32, 1, true);
+var umbraMat = new THREE.MeshBasicMaterial({
+  color: 0x000000, transparent: true, opacity: 0.0,
+  side: THREE.BackSide
+});
+var umbraCone = new THREE.Mesh(umbraGeo, umbraMat);
+scene.add(umbraCone);
+
+// Penumbra cone (partial shadow)
+var penumbraGeo = new THREE.ConeGeometry(0.01, 1, 32, 1, true);
+var penumbraMat = new THREE.MeshBasicMaterial({
+  color: 0x001122, transparent: true, opacity: 0.0,
+  side: THREE.BackSide
+});
+var penumbraCone = new THREE.Mesh(penumbraGeo, penumbraMat);
+scene.add(penumbraCone);
+
+// Earth-Moon line
+var emLineGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(1,0,0)]);
+var emLine=new THREE.Line(emLineGeo,new THREE.LineBasicMaterial({color:0x448866,transparent:true,opacity:0.3}));
+scene.add(emLine);
+
+// ── Mercury ───────────────────────────────────────────────────────────────
+var mercuryMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.05, 16, 16),
+  new THREE.MeshPhongMaterial({ color: 0xaa9966, emissive: 0x110800 })
+);
+mercuryMesh.castShadow = true;
+scene.add(mercuryMesh);
+// Mercury orbit ellipse (in ecliptic plane, GR-precessing — redrawn each frame)
+var mercOrbitLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(
+    (function(){ var pts=[]; for(var i=0;i<=360;i++){ var t=i/360*Math.PI*2; pts.push(new THREE.Vector3(Math.cos(t),0,Math.sin(t))); } return pts; })()
+  ),
+  new THREE.LineBasicMaterial({ color: 0x886644, transparent: true, opacity: 0.45 })
+);
+scene.add(mercOrbitLine);
+// Mercury-Sun connector line
+var mercLineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(1,0,0)]);
+var mercLine = new THREE.Line(mercLineGeo, new THREE.LineBasicMaterial({color:0x664422,transparent:true,opacity:0.25}));
+scene.add(mercLine);
+
+// ── Named star field (ecliptic catalog, for GR light-deflection display) ──
+var STAR_R = 600; // scene units — far background sphere
+(function(){
+  var pos = [], col = [], sz = [];
+  for (var i = 0; i < STARS.length; i++) {
+    var lam = STARS[i][0] * DEG;
+    var bet = STARS[i][1] * DEG;
+    var mag = STARS[i][2];
+    // Ecliptic → scene: x=cos(β)cos(λ), y=sin(β), z=−cos(β)sin(λ)
+    pos.push(STAR_R*Math.cos(bet)*Math.cos(lam),
+             STAR_R*Math.sin(bet),
+             -STAR_R*Math.cos(bet)*Math.sin(lam));
+    // Brightness: mag→size. Brighter (lower mag) = larger point
+    var brightness = Math.pow(10, -0.4 * (mag - (-1.46))) * 0.6 + 0.4; // normalised 0.4-1.0
+    col.push(1.0, 0.98, 0.92); // warm white
+  }
+  var g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color',    new THREE.Float32BufferAttribute(col, 3));
+  var starMat = new THREE.PointsMaterial({ size: 2.2, vertexColors: true, sizeAttenuation: false });
+  var starPts = new THREE.Points(g, starMat);
+  starPts.userData.isCatalogStars = true;
+  scene.add(starPts);
+})();
+
+// ─── Reusable THREE objects ───────────────────────────────────────────────
+var _up  = new THREE.Vector3(0,1,0);
+var _q1  = new THREE.Quaternion();
+var _q2  = new THREE.Quaternion();
+var _v3  = new THREE.Vector3();
+var _euler = new THREE.Euler();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAMERA CONTROLS (on canvas only)
+// ═══════════════════════════════════════════════════════════════════════════
+var cam = { theta:-0.42, phi:1.35, dist:22, panX:0, panY:0 };
+function camApply(){
+  var x=cam.dist*Math.sin(cam.phi)*Math.sin(cam.theta);
+  var y=cam.dist*Math.cos(cam.phi);
+  var z=cam.dist*Math.sin(cam.phi)*Math.cos(cam.theta);
+  camera.position.set(x+cam.panX, y+cam.panY, z);
+  camera.lookAt(cam.panX, cam.panY, 0);
+}
+camApply();
+
+var drag={active:false,btn:0,sx:0,sy:0,ct:0,cp:0,cx:0,cy:0};
+canvas.addEventListener('mousedown',function(e){
+  drag.active=true; drag.btn=e.button;
+  drag.sx=e.clientX; drag.sy=e.clientY;
+  drag.ct=cam.theta; drag.cp=cam.phi; drag.cx=cam.panX; drag.cy=cam.panY;
+});
+window.addEventListener('mousemove',function(e){
+  if(!drag.active) return;
+  var dx=e.clientX-drag.sx, dy=e.clientY-drag.sy;
+  if (bangaloreMode) {
+    blrLookAz += dx * 0.005;
+    blrLookEl = Math.max(-85*DEG, Math.min(85*DEG, blrLookEl - dy*0.005));
+    drag.sx=e.clientX; drag.sy=e.clientY; // incremental delta
+  } else {
+    if(drag.btn===0){
+      cam.theta=drag.ct-dx*0.007;
+      cam.phi=Math.max(0.05,Math.min(Math.PI*0.95,drag.cp-dy*0.007));
+    } else if(drag.btn===2){
+      cam.panX=drag.cx-dx*(cam.dist/600);
+      cam.panY=drag.cy+dy*(cam.dist/600);
+    }
+    camApply();
+  }
+});
+window.addEventListener('mouseup',function(){ drag.active=false; });
+canvas.addEventListener('wheel',function(e){
+  if (bangaloreMode) {
+    camera.fov=Math.max(15,Math.min(100,camera.fov+e.deltaY*0.05));
+    camera.updateProjectionMatrix();
+  } else {
+    cam.dist=Math.max(1.5,Math.min(100,cam.dist+e.deltaY*0.025)); camApply();
+  }
+},{passive:true});
+canvas.addEventListener('contextmenu',function(e){ e.preventDefault(); });
+
+// Touch
+var tc={}, tcStart={}, pinch0={d:0,cd:0}, td={active:false,sx:0,sy:0,ct:0,cp:0};
+canvas.addEventListener('touchstart',function(e){
+  if(e.target!==canvas) return; e.preventDefault();
+  for(var i=0;i<e.changedTouches.length;i++){
+    var t=e.changedTouches[i];
+    tc[t.identifier]={x:t.clientX,y:t.clientY};
+    tcStart[t.identifier]={x:t.clientX,y:t.clientY}; // save start for tap detection
+  }
+  var ids=Object.keys(tc);
+  if(ids.length===1){
+    td.active=true; td.sx=e.touches[0].clientX; td.sy=e.touches[0].clientY;
+    td.ct=cam.theta; td.cp=cam.phi;
+  } else if(ids.length===2){
+    td.active=false;
+    var t0=tc[ids[0]],t1=tc[ids[1]];
+    pinch0.d=Math.hypot(t1.x-t0.x,t1.y-t0.y);
+    pinch0.cd = bangaloreMode ? camera.fov : cam.dist;
+  }
+},{passive:false});
+canvas.addEventListener('touchmove',function(e){
+  if(e.target!==canvas) return; e.preventDefault();
+  for(var i=0;i<e.changedTouches.length;i++){
+    var t=e.changedTouches[i]; if(tc[t.identifier]) tc[t.identifier]={x:t.clientX,y:t.clientY};
+  }
+  var ids=Object.keys(tc);
+  if(ids.length===1&&td.active){
+    var dx=e.touches[0].clientX-td.sx, dy=e.touches[0].clientY-td.sy;
+    if (bangaloreMode) {
+      blrLookAz += dx * 0.006;
+      blrLookEl = Math.max(-85*DEG, Math.min(85*DEG, blrLookEl - dy*0.006));
+      td.sx=e.touches[0].clientX; td.sy=e.touches[0].clientY;
+    } else {
+      cam.theta=td.ct-dx*0.008;
+      cam.phi=Math.max(0.05,Math.min(Math.PI*0.95,td.cp-dy*0.008));
+      camApply();
+    }
+  } else if(ids.length===2){
+    var t0=tc[ids[0]],t1=tc[ids[1]];
+    var d=Math.hypot(t1.x-t0.x,t1.y-t0.y);
+    if (bangaloreMode) {
+      camera.fov=Math.max(15,Math.min(100,pinch0.cd*pinch0.d/d));
+      camera.updateProjectionMatrix();
+    } else {
+      cam.dist=Math.max(1.5,Math.min(100,pinch0.cd*pinch0.d/d)); camApply();
+    }
+  }
+},{passive:false});
+canvas.addEventListener('touchend',function(e){
+  // Tap detection: single finger, moved less than 8px
+  if(Object.keys(tc).length===1 && e.changedTouches.length===1){
+    var t=e.changedTouches[0];
+    var start=tcStart[t.identifier];
+    if(start){
+      var dx=t.clientX-start.x, dy=t.clientY-start.y;
+      if(Math.hypot(dx,dy)<8) toggleUI();
+    }
+  }
+  for(var i=0;i<e.changedTouches.length;i++){
+    delete tc[e.changedTouches[i].identifier];
+    delete tcStart[e.changedTouches[i].identifier];
+  }
+  if(Object.keys(tc).length===0) td.active=false;
+},{passive:false});
+
+// Mouse click on canvas also toggles UI
+canvas.addEventListener('click', function(e){
+  // Only toggle if it was a real click (not end of a drag)
+  if(Math.abs(e.clientX - drag.sx) < 5 && Math.abs(e.clientY - drag.sy) < 5) toggleUI();
+});
+
+var uiVisible = true;
+function toggleUI(){
+  uiVisible = !uiVisible;
+  var top = document.getElementById('top');
+  var hud = document.getElementById('hud');
+  var pt  = document.getElementById('panelToggle');
+  if(uiVisible){
+    top.classList.remove('ui-hidden');
+    hud.classList.remove('ui-hidden');
+    pt.classList.remove('ui-hidden');
+  } else {
+    top.classList.add('ui-hidden');
+    hud.classList.add('ui-hidden');
+    pt.classList.add('ui-hidden');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIMULATION STATE
+// ═══════════════════════════════════════════════════════════════════════════
+// We track elapsed days from J2000.0 (JD 2451545.0)
+var J2000_JD = 2451545.0;
+var state = {
+  running: true,
+  days: (Date.now() - Date.UTC(2000,0,1,12,0,0)) / 86400000,  // days from J2000 (can be negative)
+  spin: 0.0,      // Earth visual rotation angle (rad)
+  moonSpin: 0.0,  // Moon visual rotation (tidally locked, = moonOrbitalAngle)
+};
+
+// UI toggles
+var showTrailFlag = true;
+var showGridFlag  = true;
+var showAnnot     = true;
+var showMoonOrbit = true;
+
+// ── UI BUTTONS ─────────────────────────────────────────────────────────────
+document.getElementById('playBtn').addEventListener('click',function(){
+  state.running=true;
+  document.getElementById('playBtn').className='on';
+  document.getElementById('stopBtn').className='';
+});
+document.getElementById('stopBtn').addEventListener('click',function(){
+  state.running=false;
+  document.getElementById('stopBtn').className='on';
+  document.getElementById('playBtn').className='';
+});
+document.getElementById('rstBtn').addEventListener('click',function(){
+  state.days=(Date.now()-Date.UTC(2000,0,1,12,0,0))/86400000;
+  state.spin=0; state.moonSpin=0;
+  trailIdx=0; trailCount=0;
+  state.running=true;
+  document.getElementById('playBtn').className='on';
+  document.getElementById('stopBtn').className='';
+  document.getElementById('spd').value=0;
+  updateSpeedLabel(0);
+});
+document.getElementById('spd').addEventListener('input',function(){
+  updateSpeedLabel(parseFloat(this.value));
+});
+var LOG86400 = Math.log10(86400); // 4.93655… — offset so v=0 = exactly 1 s/s
+function spdToDaysPerSec(v) {
+  // v=0 → 1 s/s; v=7 → ~116 d/s; v=-7 → ~116 d/s backward
+  return v >= 0 ? Math.pow(10, v - LOG86400) : -Math.pow(10, -v - LOG86400);
+}
+function updateSpeedLabel(v) {
+  var daysPerSec = spdToDaysPerSec(v);
+  var dir = daysPerSec >= 0 ? '→ ' : '← ';
+  var absDps = Math.abs(daysPerSec);
+  var yrPerSec = absDps / (46751/128);
+  var label;
+  if (absDps < 1) {
+    var secsPerSec = absDps * 86400;
+    if (secsPerSec < 60)        label = secsPerSec.toFixed(1) + ' s/s';
+    else if (secsPerSec < 3600) label = (secsPerSec/60).toFixed(1) + ' min/s';
+    else                        label = (secsPerSec/3600).toFixed(1) + ' h/s';
+  } else if (yrPerSec < 1)       label = absDps.toFixed(1) + ' d/s';
+  else if (yrPerSec < 10)        label = yrPerSec.toFixed(2) + ' yr/s';
+  else if (yrPerSec < 1000)      label = yrPerSec.toFixed(0) + ' yr/s';
+  else                           label = (yrPerSec/1000).toFixed(1) + ' kyr/s';
+  document.getElementById('spdV').textContent = dir + label;
+}
+updateSpeedLabel(0); // init label: → 1 s/s
+function applyGotoDate() {
+  var yearVal = parseInt(document.getElementById('gotoYear').value);
+  var month   = parseInt(document.getElementById('gotoMonth').value);
+  var day     = parseInt(document.getElementById('gotoDay').value);
+  if (isNaN(yearVal) || isNaN(day) || day < 1) return;
+  // Direct astronomical year: 0 = 1 BCE, -1 = 2 BCE, -3227 = 3228 BCE
+  var astroYear = yearVal;
+  var jd = dateToJD(astroYear, month, day);
+  state.days = jd - J2000_JD;
+}
+document.getElementById('gotoBtn').addEventListener('click', applyGotoDate);
+['gotoYear', 'gotoDay'].forEach(function(id) {
+  document.getElementById(id).addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') applyGotoDate();
+  });
+});
+document.getElementById('trailBtn').addEventListener('click',function(){
+  showTrailFlag=!showTrailFlag; trailLine.visible=showTrailFlag;
+  this.className=showTrailFlag?'on':'';
+});
+document.getElementById('gridBtn').addEventListener('click',function(){
+  showGridFlag=!showGridFlag; eclipGroup.visible=showGridFlag;
+  this.className=showGridFlag?'on':'';
+});
+document.getElementById('annotBtn').addEventListener('click',function(){
+  showAnnot=!showAnnot;
+  this.className=showAnnot?'on':'';
+});
+document.getElementById('moonOrbitBtn').addEventListener('click',function(){
+  showMoonOrbit=!showMoonOrbit; moonOrbitGroup.visible=showMoonOrbit;
+  this.className=showMoonOrbit?'on':'';
+});
+
+// ── LOCAL SKY VIEW ────────────────────────────────────────────────────────
+// Observer location — defaults to Bengaluru, overridden by GPS if available
+var BLR_LAT = 12.9716 * DEG;   // rad — updated by geolocation
+var BLR_LON = 77.5946 * DEG;   // rad — updated by geolocation
+var OBS_NAME = 'Bengaluru, India  12.97°N 77.59°E';
+
+// Request GPS; on success update coords and auto-enter local view
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var lat = pos.coords.latitude, lon = pos.coords.longitude;
+    BLR_LAT = lat * DEG;
+    BLR_LON = lon * DEG;
+    var latStr = Math.abs(lat).toFixed(2) + '\xB0' + (lat >= 0 ? 'N' : 'S');
+    var lonStr = Math.abs(lon).toFixed(2) + '\xB0' + (lon >= 0 ? 'E' : 'W');
+    OBS_NAME = latStr + ' ' + lonStr;
+    document.getElementById('obsLocSpan').textContent = '\uD83D\uDCCD My Location  ' + OBS_NAME;
+    document.getElementById('blrBtn').textContent = '\uD83D\uDCCD My Sky';
+    if (!bangaloreMode) document.getElementById('blrBtn').click();
+  }, null, { timeout: 8000, maximumAge: 300000 });
+}
+
+// GAST offset at J2000.0: Greenwich Mean Sidereal Time at J2000 = 280.46061837°
+var GAST_J2000 = 280.46061837 * DEG;
+// Earth rotation rate: exact from 366.2421875 sidereal rotations per 365.2421875 solar days
+// = 46879 sidereal rotations per 46751 solar days
+var EARTH_ROT_RATE = TWO_PI * 46879 / 46751; // rad/day
+
+var bangaloreMode = false;
+var blrCamSaved   = null; // save helio cam state
+var blrLookAz = Math.PI / 2;      // gaze azimuth (N=0, E=90°, S=180°, W=270°) — default east
+var blrLookEl = 0;                // gaze elevation above horizon — default at horizon
+var blrSavedVis = null;           // saved visibility state when entering Bengaluru mode
+// All scene objects hidden in Bengaluru mode (only Sun, Moon, and stars remain)
+var BLR_HIDE = [
+  eclipGroup, orbitGroup, seasonGroup, veLine, seLine, earthGroup, eqPlane,
+  moonOrbitGroup, emLine, ncpMesh, poleAxisLine, trailLine, umbraCone, penumbraCone,
+  mercuryMesh, mercOrbitLine, mercLine
+];
+
+// Phase disc canvas
+var phaseDisc    = document.getElementById('phaseDisc');
+var phaseCtx     = phaseDisc ? phaseDisc.getContext('2d') : null;
+var monthStrip   = document.getElementById('monthStrip');
+var monthCtx     = monthStrip ? monthStrip.getContext('2d') : null;
+
+function drawPhaseDisc(elongDeg, r_km) {
+  if (!phaseCtx) return;
+  var W = phaseDisc.width, H = phaseDisc.height;
+  var cx = W/2, cy = H/2, r = W/2 - 2;
+  phaseCtx.clearRect(0, 0, W, H);
+
+  // Dark side (full circle)
+  phaseCtx.beginPath();
+  phaseCtx.arc(cx, cy, r, 0, Math.PI*2);
+  phaseCtx.fillStyle = '#111';
+  phaseCtx.fill();
+
+  // Illuminated fraction — elongation 0=new, 90=quarter, 180=full, 270=last quarter
+  var e = ((elongDeg % 360) + 360) % 360;
+  var illumFrac = (1 - Math.cos(e * DEG)) / 2; // 0=new, 1=full
+
+  // Draw lit side using the standard phase geometry:
+  // Right half always lit for waxing (0–180°), left for waning (180–360°)
+  phaseCtx.save();
+  phaseCtx.beginPath();
+  phaseCtx.arc(cx, cy, r, 0, Math.PI*2);
+  phaseCtx.clip();
+
+  if (e < 180) {
+    // Waxing: lit on right (west limb at new, full right at quarter, full disc at full)
+    // Draw right semicircle lit
+    phaseCtx.beginPath();
+    phaseCtx.arc(cx, cy, r, -Math.PI/2, Math.PI/2);
+    phaseCtx.lineTo(cx, cy - r);
+    phaseCtx.fillStyle = '#e8e0c8';
+    phaseCtx.fill();
+    // Terminator: ellipse with x-radius = r * |cos(e)|, mirrored
+    var tx = r * Math.cos(e * DEG); // negative when past 90°
+    phaseCtx.beginPath();
+    phaseCtx.ellipse(cx, cy, Math.abs(tx), r, 0, -Math.PI/2, Math.PI/2, e > 90);
+    phaseCtx.lineTo(cx, cy - r);
+    phaseCtx.fillStyle = e < 90 ? '#111' : '#e8e0c8';
+    phaseCtx.fill();
+  } else {
+    // Waning: lit on left
+    phaseCtx.beginPath();
+    phaseCtx.arc(cx, cy, r, Math.PI/2, 3*Math.PI/2);
+    phaseCtx.lineTo(cx, cy + r);
+    phaseCtx.fillStyle = '#e8e0c8';
+    phaseCtx.fill();
+    var tx2 = r * Math.cos(e * DEG);
+    phaseCtx.beginPath();
+    phaseCtx.ellipse(cx, cy, Math.abs(tx2), r, 0, Math.PI/2, 3*Math.PI/2, e < 270);
+    phaseCtx.lineTo(cx, cy + r);
+    phaseCtx.fillStyle = e > 270 ? '#111' : '#e8e0c8';
+    phaseCtx.fill();
+  }
+  phaseCtx.restore();
+
+  // Border
+  phaseCtx.beginPath();
+  phaseCtx.arc(cx, cy, r, 0, Math.PI*2);
+  phaseCtx.strokeStyle = '#334';
+  phaseCtx.lineWidth = 1;
+  phaseCtx.stroke();
+}
+
+function drawMonthStrip(currentElongDeg, currentAge) {
+  if (!monthCtx) return;
+  var W = monthStrip.width, H = monthStrip.height;
+  monthCtx.clearRect(0, 0, W, H);
+  monthCtx.fillStyle = '#060810';
+  monthCtx.fillRect(0, 0, W, H);
+
+  var N = 30; // 30 day strip
+  var cellW = W / N;
+
+  for (var i = 0; i < N; i++) {
+    var dayAngle = (i / 29.530589) * 360; // elongation at this day of cycle
+    var e = ((dayAngle) % 360 + 360) % 360;
+    var illum = (1 - Math.cos(e * DEG)) / 2;
+    var cx2 = i * cellW + cellW/2;
+    var r2  = H/2 - 3;
+    var cy2 = H/2;
+
+    // Moon disc background
+    monthCtx.beginPath();
+    monthCtx.arc(cx2, cy2, r2, 0, Math.PI*2);
+    monthCtx.fillStyle = '#111';
+    monthCtx.fill();
+
+    // Lit portion (simplified: just brightness)
+    monthCtx.beginPath();
+    monthCtx.arc(cx2, cy2, r2, 0, Math.PI*2);
+    var grd = monthCtx.createRadialGradient(cx2, cy2, 0, cx2, cy2, r2);
+    var bright = Math.round(illum * 200 + 20);
+    grd.addColorStop(0, 'rgba('+bright+','+Math.round(bright*0.95)+','+Math.round(bright*0.85)+','+illum+')');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    monthCtx.fillStyle = grd;
+    monthCtx.fill();
+
+    // Current day marker
+    var ageFrac = (currentAge % 29.530589) / 29.530589;
+    var markerX = ageFrac * W;
+    if (Math.abs(cx2 - markerX) < cellW/2) {
+      monthCtx.strokeStyle = '#c9a84c';
+      monthCtx.lineWidth = 1.5;
+      monthCtx.beginPath();
+      monthCtx.arc(cx2, cy2, r2+1, 0, Math.PI*2);
+      monthCtx.stroke();
+    }
+  }
+
+  // Day labels at key phases
+  var phases = [{d:0,l:'New'},{d:7.38,l:'1Q'},{d:14.77,l:'Full'},{d:22.15,l:'3Q'},{d:29.53,l:'New'}];
+  monthCtx.font = '8px Courier New';
+  monthCtx.fillStyle = '#556';
+  monthCtx.textAlign = 'center';
+  phases.forEach(function(p){
+    var x = (p.d / 29.530589) * W;
+    if (x < W) {
+      monthCtx.fillStyle = '#5a6a7a';
+      monthCtx.fillText(p.l, x, H - 1);
+    }
+  });
+}
+
+document.getElementById('blrBtn').addEventListener('click', function(){
+  bangaloreMode = !bangaloreMode;
+  this.className = bangaloreMode ? 'on' : '';
+  document.getElementById('blrOverlay').style.display = bangaloreMode ? 'block' : 'none';
+  if (bangaloreMode) {
+    // Save helio camera and scene visibility
+    blrCamSaved = { theta:cam.theta, phi:cam.phi, dist:cam.dist, panX:cam.panX, panY:cam.panY };
+    blrSavedVis = BLR_HIDE.map(function(o){ return o.visible; });
+    BLR_HIDE.forEach(function(o){ o.visible = false; });
+    // Reset gaze to east, at horizon level
+    blrLookAz = Math.PI / 2;
+    blrLookEl = 0;
+    camera.fov = 80;
+    camera.updateProjectionMatrix();
+    // 3 h/s — Moon crosses the sky (~12 h) in ~4 simulation minutes
+    document.getElementById('spd').value = 4.03;
+    updateSpeedLabel(4.03);
+  } else {
+    // Restore scene visibility
+    if (blrSavedVis) {
+      BLR_HIDE.forEach(function(o, i){ o.visible = blrSavedVis[i]; });
+      blrSavedVis = null;
+    }
+    // Restore helio camera and settings
+    if (blrCamSaved) {
+      cam.theta=blrCamSaved.theta; cam.phi=blrCamSaved.phi;
+      cam.dist=blrCamSaved.dist; cam.panX=blrCamSaved.panX; cam.panY=blrCamSaved.panY;
+      camApply();
+    }
+    camera.fov = 45;
+    camera.up.set(0, 1, 0);
+    camera.updateProjectionMatrix();
+    renderer.setClearColor(0x000000);
+  }
+});
+
+// Panel toggle
+var panelOpen = false;
+var panel = document.getElementById('panel');
+var panelToggle = document.getElementById('panelToggle');
+var hud = document.getElementById('hud');
+var legend = document.getElementById('legend');
+// start closed
+hud.style.right = '0';
+panelToggle.addEventListener('click', function(){
+  panelOpen = !panelOpen;
+  if (panelOpen) {
+    panel.classList.remove('hidden');
+    legend.classList.remove('hidden');
+    panelToggle.style.right = '220px';
+    panelToggle.textContent = '✕ Info';
+    hud.style.right = '220px';
+  } else {
+    panel.classList.add('hidden');
+    legend.classList.add('hidden');
+    panelToggle.style.right = '0';
+    panelToggle.textContent = '☰ Info';
+    hud.style.right = '0';
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATE / TIME UTILITY
+// ═══════════════════════════════════════════════════════════════════════════
+var MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var J2000_UNIX_MS = Date.UTC(2000, 0, 1, 12, 0, 0); // Unix ms of J2000.0
+
+function jdToGregorian(jd) {
+  // Meeus Ch.7: Julian calendar before JD 2299161 (Oct 15, 1582), Gregorian after
+  var z = Math.floor(jd + 0.5);
+  var f = (jd + 0.5) - z;          // fractional day (0–1)
+  var a = z;
+  if (z >= 2299161) {              // Gregorian reform: apply correction
+    var alpha = Math.floor((z - 1867216.25) / 36524.25);
+    a = z + 1 + alpha - Math.floor(alpha / 4);
+  }
+  // z < 2299161 → Julian calendar (no correction applied)
+  var b = a + 1524;
+  var c = Math.floor((b - 122.1) / 365.25);
+  var d = Math.floor(365.25 * c);
+  var e = Math.floor((b - d) / 30.6001);
+  var day   = b - d - Math.floor(30.6001 * e);
+  var month = e < 14 ? e - 1 : e - 13;
+  var year  = month > 2 ? c - 4716 : c - 4715;
+  var hh    = Math.floor(f * 24);
+  var mm    = Math.floor((f * 24 - hh) * 60);
+  var ss    = Math.floor(((f * 24 - hh) * 60 - mm) * 60);
+  return { year: year, month: month, day: day, hh: hh, mm: mm, ss: ss };
+}
+var JD_GREG_REFORM = 2299161; // Oct 15, 1582 — Gregorian reform boundary
+
+// Convert calendar date → Julian Day Number (Meeus Ch.7)
+// year: astronomical year (0 = 1 BC, negative for earlier)
+// Uses Julian calendar before Oct 15 1582, Gregorian from that date on
+function dateToJD(year, month, day) {
+  var isGreg = (year > 1582) ||
+               (year === 1582 && month > 10) ||
+               (year === 1582 && month === 10 && day >= 15);
+  var y = year, m = month;
+  if (m <= 2) { y -= 1; m += 12; }
+  var A = Math.floor(y / 100);
+  var B = isGreg ? (2 - A + Math.floor(A / 4)) : 0;
+  return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + day + B - 1524.5;
+}
+var DOW_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function dowFromJD(jd) { return DOW_NAMES[Math.floor(jd + 1.5) % 7]; }
+function formatDate(jd) {
+  var g = jdToGregorian(jd);
+  var pad = function(n){ return n < 10 ? '0'+n : ''+n; };
+  var yr  = g.year <= 0 ? (1 - g.year) + ' BCE' : g.year;
+  var cal = jd < JD_GREG_REFORM ? ' (Julian)' : '';
+  return dowFromJD(jd) + '  ' + g.day + ' ' + MON_NAMES[g.month-1] + ' ' + yr +
+         '  ' + pad(g.hh) + ':' + pad(g.mm) + ':' + pad(g.ss) + ' UTC' + cal;
+}
+// Date/time bar — Julian before 1582, Gregorian after; local timezone for modern dates
+function formatLocalTime(jd) {
+  var g   = jdToGregorian(jd);
+  var pad = function(n){ return n < 10 ? '0'+n : ''+n; };
+  var yr  = g.year <= 0 ? (1 - g.year) + ' BCE' : g.year;
+  var dateStr = g.day + ' ' + MON_NAMES[g.month-1] + ' ' + yr;
+  if (jd >= JD_GREG_REFORM) {
+    // Modern date: show local civil time with timezone label
+    var ms  = J2000_UNIX_MS + state.days * 86400000;
+    var d   = new Date(ms);
+    var off = -d.getTimezoneOffset();
+    var offH = Math.floor(Math.abs(off)/60), offM = Math.abs(off)%60;
+    var tzLabel = 'UTC' + (off>=0?'+':'-') + offH + (offM?':'+pad(offM):'');
+    return dateStr + '  ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + ' ' + tzLabel;
+  } else {
+    // Historical: Julian calendar, UTC time only
+    return dateStr + '  ' + pad(g.hh) + ':' + pad(g.mm) + ':' + pad(g.ss) + ' UTC (Julian)';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN ANIMATION LOOP
+// ═══════════════════════════════════════════════════════════════════════════
+var lastT=null;
+
+function animate(ts){
+  requestAnimationFrame(animate);
+  var dt=0;
+  if(lastT!==null) dt=Math.min((ts-lastT)/1000, 0.1);
+  lastT=ts;
+
+  if(state.running && dt>0){
+    // Bidirectional log-scale: v=0 → real-time (1 s/s); v>0 faster forward; v<0 backward
+    var v = parseFloat(document.getElementById('spd').value);
+    if (Math.abs(v) < 0.005) {
+      // At rest (v≈0): lock to actual wall clock — no drift ever
+      state.days = (Date.now() - J2000_UNIX_MS) / 86400000;
+    } else {
+      var daysPerSec = spdToDaysPerSec(v);
+      var dDays = daysPerSec * dt;
+      state.days += dDays;
+    }
+    // Earth sidereal spin: exact 366.2421875 rotations per 365.2421875 solar days
+    state.spin += dDays * TWO_PI * 46879 / 46751;
+    // Precession is NOT separately controlled — it is 100% derived from
+    // Precession derived from state.days × (T_sid−T_trop)/(T_sid×T_trop).
+    // Rate ≈ 50.30 arcsec/yr, platonic year ≈ 25765 tropical years.
+  }
+
+  // ── Derived quantities ────────────────────────────────────────────────
+  var T_yr   = state.days / EARTH.Ty;         // tropical years from J2000
+  var T_sid  = state.days / EARTH.Tsid;       // sidereal years
+  var psiRad = getPsiRad(state.days);
+  var epsRad = getEpsRad(T_yr);
+
+  // Earth mean anomaly (from perihelion)
+  // VSOP87 J2000 value 357.5291° corrected by −0.929° so that at VE2026
+  // (2026-03-20 14:46 UTC, state.days=9575.115) eclipLon_inertial = exactly π.
+  var M0_earth = (357.5291 - 0.929) * DEG;   // = 356.600°
+  var earthE_meanAnom = M0_earth + (state.days / EARTH.Tsid) * TWO_PI;
+
+  // Current eccentricity (secular drift negligible at human timescales but included)
+  var e_earth = EARTH.e0 + EARTH.eDot * T_yr;
+  e_earth = Math.max(0.0001, Math.min(0.2, e_earth));
+
+  // Current perihelion longitude (apsidal precession)
+  var varpi = EARTH.varpi0 + EARTH.varpiDot * state.days;
+
+  // True anomaly
+  var nu_earth = trueAnom(earthE_meanAnom, e_earth);
+
+  // Heliocentric distance (AU)
+  var r_AU = EARTH.a * (1 - e_earth*e_earth) / (1 + e_earth*Math.cos(nu_earth));
+  var r_KM = r_AU * AU_KM;
+
+  // Ecliptic longitude of Earth (from J2000 VE fixed direction +X)
+  // ecliptic lon = nu + varpi (from fixed VE direction)
+  // Precession: VE direction rotates, so inertial ecliptic lon of Earth = nu + varpi - psi
+  var eclipLon_inertial = nu_earth + varpi - psiRad;
+
+  // Scene position of Earth
+  var r_sc = r_AU * AU_SC;
+  var ex = r_sc * Math.cos(eclipLon_inertial);
+  var ez = -r_sc * Math.sin(eclipLon_inertial);
+  earthGroup.position.set(ex, 0, ez);
+
+  // ── NCP direction (ecliptic frame) ────────────────────────────────────
+  // NCP = (sin ε cos ψ, cos ε, −sin ε sin ψ)  [IAU 2006]
+  var ncpX = Math.sin(epsRad)*Math.cos(psiRad);
+  var ncpY = Math.cos(epsRad);
+  var ncpZ = -Math.sin(epsRad)*Math.sin(psiRad);
+  var ncpDir = new THREE.Vector3(ncpX,ncpY,ncpZ).normalize();
+
+  // Orient entire earthGroup by TILT ONLY (no spin) — axis line & equator ring stay stable
+  _q1.setFromUnitVectors(_up, ncpDir);
+  earthGroup.quaternion.copy(_q1);
+
+  // Apply daily spin ONLY to the globe mesh (first child), not the axis or rings
+  _q2.setFromAxisAngle(_up, state.spin); // spin around local +Y (= ncpDir after group tilt)
+  earthMesh.quaternion.copy(_q2);
+
+  // Equatorial plane (world space) — tilt only, no spin
+  eqPlane.position.copy(earthGroup.position);
+  eqPlane.quaternion.copy(_q1);
+
+  // ── Season markers + VE line (co-rotate with precessing VE) ──────────
+  // VE direction: at J2000 along +X, retrograde by psiRad → angle = +psiRad on Y-axis
+  seasonGroup.rotation.y = psiRad;
+  // VE line (always points to current VE in ecliptic plane)
+  var veX=Math.cos(psiRad)*AU_SC*1.73, veZ=Math.sin(psiRad)*AU_SC*1.73;
+  veLine.geometry.setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(veX,0,veZ)]);
+  veLine.geometry.computeBoundingSphere();
+
+  // ── Sun-Earth line ────────────────────────────────────────────────────
+  seLine.geometry.setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(ex,0,ez)]);
+  seLine.geometry.computeBoundingSphere();
+
+  // ── NCP on celestial sphere ───────────────────────────────────────────
+  var ncpPos = ncpDir.clone().multiplyScalar(PREC_R);
+  ncpMesh.position.copy(ncpPos);
+  poleAxisLine.geometry.setFromPoints([new THREE.Vector3(0,0,0), ncpDir.clone().multiplyScalar(PREC_R*1.08)]);
+  poleAxisLine.geometry.computeBoundingSphere();
+
+  // Trail
+  if(state.running && showTrailFlag){
+    trailBuf[trailIdx%TRAIL_MAX].copy(ncpPos);
+    trailIdx++; trailCount=Math.min(trailCount+1,TRAIL_MAX);
+    var filled=[], st=trailIdx%TRAIL_MAX;
+    for(var i=0;i<trailCount;i++) filled.push(trailBuf[(st+i)%TRAIL_MAX].clone());
+    trailLine.geometry.dispose();
+    trailLine.geometry=new THREE.BufferGeometry().setFromPoints(filled);
+  }
+
+  // ── MOON (ELP 2000-82 first-order) ───────────────────────────────────
+  // Phase from synodic cycle counting — exact at JDN 2461133 (Apr 2, 2026 full moon)
+  // state.days 9588 = JDN 2461133 − J2000_JDN = 2461133 − 2451545
+  var D_cycle_rad = Math.PI + (state.days - 9588.0) / MOON.Tsyn * TWO_PI;
+
+  // Meeus Ch.47 polynomials for orbital plane elements (Ω, Mm, F, Ms)
+  // Used only for perturbation arguments and node/apse orientation — NOT for ecliptic longitude
+  var T_JC = state.days / 36525;
+  var T2 = T_JC * T_JC, T3 = T2 * T_JC;
+  // Mean anomaly from perigee anchor: Dec 26 2045 14:49 UTC (state.days 16796.117361), T_anom = 27.55 d
+  var moonM = (((TWO_PI * (state.days - 16796.117361) / 27.55) % TWO_PI) + TWO_PI) % TWO_PI;
+  var Om_deg = ((125.0445479 - 1934.136261*T_JC + 0.0020708*T2 + T3/450000)  % 360 + 360) % 360;
+  var F_deg  = (( 93.2720950 + 483202.0175*T_JC - 0.0036539*T2 - T3/3526000) % 360 + 360) % 360;
+  var Ms_deg = ((357.5291    + 35999.0503 *T_JC - 0.0001559*T2 - T3/24490000)% 360 + 360) % 360;
+
+  var moonOmega = Om_deg * DEG;
+  var moonF = F_deg * DEG;
+  // moonL derived from cycle-counted D and Sun position (not Meeus polynomial)
+  var moonL = eclipLon_inertial + Math.PI + psiRad + D_cycle_rad;  // tropical frame
+  var moonOmegaSmall = moonL - moonOmega - moonM;
+
+  // ELP perturbation arguments
+  var D  = D_cycle_rad;
+  var Ms = Ms_deg * DEG;
+  var Mm = moonM;
+  var F  = moonF;
+
+  // Longitude corrections (arcsec → rad, largest ELP terms)
+  var dLon = (
+    + 6288774 * Math.sin(Mm)
+    + 1274027 * Math.sin(2*D - Mm)
+    +  658314 * Math.sin(2*D)
+    +  213618 * Math.sin(2*Mm)
+    -  185116 * Math.sin(Ms)
+    -  114332 * Math.sin(2*F)
+    +   58793 * Math.sin(2*D - 2*Mm)
+    +   57066 * Math.sin(2*D - Ms - Mm)
+    +   53322 * Math.sin(2*D + Mm)
+    +   45758 * Math.sin(2*D - Ms)
+    -   40923 * Math.sin(Ms - Mm)
+    -   34720 * Math.sin(D)
+    -   30383 * Math.sin(Ms + Mm)
+    +   15327 * Math.sin(2*D - 2*F)
+    -   12528 * Math.sin(Mm + 2*F)
+    +   10980 * Math.sin(Mm - 2*F)
+    +   10675 * Math.sin(4*D - Mm)
+    +   10034 * Math.sin(3*Mm)
+    +    8548 * Math.sin(4*D - 2*Mm)
+    -    7888 * Math.sin(2*D + Ms - Mm)
+    -    6766 * Math.sin(2*D + Ms)
+    -    5163 * Math.sin(D - Mm)
+  ) * 1e-7 * DEG; // units: 1e-7 degrees → radians
+
+  // Latitude corrections
+  var dLat = (
+    + 5128122 * Math.sin(F)
+    +  280602 * Math.sin(Mm + F)
+    +  277693 * Math.sin(Mm - F)
+    +  173237 * Math.sin(2*D - F)
+    +   55413 * Math.sin(2*D - Mm + F)
+    +   46271 * Math.sin(2*D - Mm - F)
+    +   32573 * Math.sin(2*D + F)
+    +   17198 * Math.sin(2*Mm + F)
+    +    9266 * Math.sin(2*D + Mm - F)
+    +    8822 * Math.sin(2*Mm - F)
+    +    8216 * Math.sin(2*D - Ms - F)
+    +    4324 * Math.sin(2*D - 2*Mm - F)
+    +    4200 * Math.sin(2*D + Mm + F)
+    -    3359 * Math.sin(2*D + Ms - F)
+  ) * 1e-7 * DEG;
+
+  // Distance correction (km)
+  var dDist = (
+    - 20905355 * Math.cos(Mm)
+    -  3699111 * Math.cos(2*D - Mm)
+    -  2955968 * Math.cos(2*D)
+    -   569925 * Math.cos(2*Mm)
+    +    48888 * Math.cos(Ms)
+    -     3149 * Math.cos(2*F)
+    +   246158 * Math.cos(2*D - 2*Mm)
+    -   152138 * Math.cos(2*D - Ms - Mm)
+    -   170733 * Math.cos(2*D + Mm)
+    -   204586 * Math.cos(2*D - Ms)
+    -   129620 * Math.cos(Ms - Mm)
+    +   108743 * Math.cos(D)
+    +   104755 * Math.cos(Ms + Mm)
+    +    10321 * Math.cos(2*D - 2*F)
+    +    79661 * Math.cos(Mm - 2*F)
+    -    34782 * Math.cos(4*D - Mm)
+    -    23210 * Math.cos(3*Mm)
+    -    21636 * Math.cos(4*D - 2*Mm)
+    +    24208 * Math.cos(2*D + Ms - Mm)
+    +    30824 * Math.cos(2*D + Ms)
+    -    25.0  * Math.cos(D - Mm) // small
+  ) * 0.001; // metres → km (already in metres from ELP, /1000)
+
+  // True anomaly of Moon (Keplerian base)
+  var nu_moon = trueAnom(moonM, MOON.e0);
+  // Base distance
+  var moon_r_km_base = MOON.a * (1 - MOON.e0*MOON.e0) / (1 + MOON.e0*Math.cos(nu_moon));
+  // ELP-corrected distance
+  var moon_r_km = moon_r_km_base + dDist;
+  moon_r_km = Math.max(356400, Math.min(406700, moon_r_km)); // clamp to physical range
+  var moon_r_sc = (moon_r_km / MOON.a) * MOON_SC;
+
+  // Moon true ecliptic longitude in J2000 inertial frame
+  // = sunGeoLon_J2000 + D_cycle_rad + dLon
+  // sunGeoLon_J2000 = eclipLon_inertial + π (Earth heliocentric lon + π)
+  var lambda_J2000 = eclipLon_inertial + Math.PI + D_cycle_rad + dLon;
+  var beta = dLat; // ecliptic latitude from ELP
+
+  // Spherical (lambda, beta) → J2000 inertial ecliptic rectangular
+  var mx_sc = moon_r_sc * Math.cos(beta) * Math.cos(lambda_J2000);
+  var my_sc = moon_r_sc * Math.sin(beta);
+  var mz_sc = -moon_r_sc * Math.cos(beta) * Math.sin(lambda_J2000);
+
+  // Moon world position
+  moonMesh.position.set(ex + mx_sc, my_sc, ez + mz_sc);
+
+  // ── MERCURY (GR apsidal precession: 43.0″/cy beyond Newtonian) ───────────
+  // The GR extra precession δω = 24π³a²/(T²c²(1−e²)) = 43.0″/cy
+  var omega_merc = MERCURY.omega + MERCURY.omegaDot_GR * state.days;
+  var M_merc = MERCURY.M0 + (state.days / MERCURY.Ty) * TWO_PI;
+  var nu_merc = trueAnom(M_merc, MERCURY.e);
+  var r_merc_AU = MERCURY.a * (1 - MERCURY.e * MERCURY.e) / (1 + MERCURY.e * Math.cos(nu_merc));
+  var u_merc = omega_merc + nu_merc; // argument of latitude
+  var cosO_m = Math.cos(MERCURY.Omega), sinO_m = Math.sin(MERCURY.Omega);
+  var cosU_m = Math.cos(u_merc),        sinU_m = Math.sin(u_merc);
+  var cosI_m = Math.cos(MERCURY.i),     sinI_m = Math.sin(MERCURY.i);
+  var mx_ecl_m = r_merc_AU * (cosO_m*cosU_m - sinO_m*sinU_m*cosI_m);
+  var my_ecl_m = r_merc_AU * (sinO_m*cosU_m + cosO_m*sinU_m*cosI_m);
+  var mz_ecl_m = r_merc_AU * (sinU_m * sinI_m);
+  var merc_sc = new THREE.Vector3(mx_ecl_m*AU_SC, mz_ecl_m*AU_SC, -my_ecl_m*AU_SC);
+  mercuryMesh.position.copy(merc_sc);
+  mercLine.geometry.setFromPoints([new THREE.Vector3(0,0,0), merc_sc]);
+  mercLine.geometry.computeBoundingSphere();
+  // Redraw Mercury orbit ellipse rotated to current perihelion direction
+  (function(){
+    var pts = [];
+    var a = MERCURY.a * AU_SC, b = a * Math.sqrt(1 - MERCURY.e*MERCURY.e), c = a * MERCURY.e;
+    var cosO = cosO_m, sinO = sinO_m, cosI = cosI_m, sinI = sinI_m;
+    var cosW = Math.cos(omega_merc), sinW = Math.sin(omega_merc);
+    for (var ii = 0; ii <= 90; ii++) {
+      var tt = ii/90 * TWO_PI;
+      // Parametric ellipse in orbital plane → ecliptic → scene
+      var px = a*Math.cos(tt) - c; // periapsis side
+      var py = b*Math.sin(tt);
+      // Rotate by ω (argument of perihelion)
+      var qx = px*cosW - py*sinW;
+      var qy = px*sinW + py*cosW;
+      // Rotate by i (inclination) around ascending node
+      var ex3 = qx;
+      var ey3 = qy * cosI;
+      var ez3 = qy * sinI;
+      // Rotate by Ω (node) around ecliptic z
+      var rx = ex3*cosO - ey3*sinO;
+      var ry = ex3*sinO + ey3*cosO;
+      var rz = ez3;
+      pts.push(new THREE.Vector3(rx, rz, -ry));
+    }
+    mercOrbitLine.geometry.setFromPoints(pts);
+    mercOrbitLine.geometry.computeBoundingSphere();
+  })();
+  document.getElementById('hMercR').textContent = r_merc_AU.toFixed(4) + ' AU';
+  // Cumulative GR precession of perihelion since J2000 (in arcseconds)
+  var merc_gr_precessed_as = (MERCURY.omegaDot_GR * state.days / AS2R).toFixed(1);
+  document.getElementById('hMercGR').textContent =
+    '43.0″/cy · Δω=' + merc_gr_precessed_as + '″';
+
+  // ── ECLIPSE DETECTION (precise angular criterion) ─────────────────────
+  // Uses actual angular radii and separation — matches published eclipse data
+  // Sun angular radius as seen from Earth (radians)
+  var sunAngR  = Math.atan2(SUN_RADIUS_KM, r_KM);        // ~0.00465 rad at mean dist
+  // Moon angular radius as seen from Earth (radians)
+  var moonAngR = Math.atan2(MOON.R_mean, moon_r_km);      // ~0.00450–0.00560 rad
+  // Earth angular radius as seen from Moon (for lunar eclipse)
+  var earthAngR_fromMoon = Math.atan2(EARTH.R_eq, moon_r_km); // ~0.01745 rad
+
+  // Sun direction from Earth (unit vector, scene coords)
+  var sunDir = new THREE.Vector3(-ex, 0, -ez).normalize();
+  // Moon direction from Earth (unit vector)
+  var moonRelVec = new THREE.Vector3(mx_sc, my_sc, mz_sc);
+  var moonDist_sc = moonRelVec.length();
+  var moonDir = moonRelVec.clone().normalize();
+
+  // Angular separation Sun-Moon as seen from Earth (radians)
+  var elongRad = Math.acos(Math.max(-1, Math.min(1, sunDir.dot(moonDir))));
+
+  // ── SOLAR ECLIPSE (Moon between Sun and Earth) ────────────────────────
+  // Condition: elongation < sum of angular radii, Moon closer than Sun
+  // Penumbral: elongation < sunAngR + moonAngR  (partial)
+  // Umbral:    elongation < |sunAngR - moonAngR| (total/annular)
+  var solarEclipseType = 'none';
+  var solarEclipseAmt  = 0; // 0..1
+  if (moonDist_sc < r_sc * 0.1) { // Moon must be near Earth-Sun line, Sun-ward side
+    var dotSun = sunDir.dot(moonDir);
+    if (dotSun > 0.99) { // Moon roughly in Sun direction
+      var angSep = elongRad;
+      var penLimit = sunAngR + moonAngR;
+      var umbraLimit = Math.abs(sunAngR - moonAngR);
+      if (angSep < umbraLimit) {
+        solarEclipseType = moonAngR > sunAngR ? 'total' : 'annular';
+        solarEclipseAmt = 1.0;
+      } else if (angSep < penLimit) {
+        solarEclipseType = 'partial';
+        solarEclipseAmt = 1.0 - (angSep - umbraLimit) / (penLimit - umbraLimit);
+      }
+    }
+  }
+
+  // ── LUNAR ECLIPSE (Earth's shadow on Moon) ────────────────────────────
+  // Moon opposite Sun direction from Earth
+  // Earth umbra cone half-angle: alpha_u = asin((R_sun - R_earth) / r_ES)
+  // Earth penumbra cone half-angle: alpha_p = asin((R_sun + R_earth) / r_ES)
+  var R_sun_km = SUN_RADIUS_KM;
+  var R_earth_km = EARTH.R_eq;
+  var alphaUmbra    = Math.asin((R_sun_km - R_earth_km) / r_KM);  // ~0.00450 rad
+  var alphaPenumbra = Math.asin((R_sun_km + R_earth_km) / r_KM);  // ~0.00507 rad
+
+  // Radius of Earth's umbra/penumbra at Moon's distance from Earth
+  var umbraRadKm    = R_earth_km - moon_r_km * Math.tan(alphaUmbra);
+  var penumbraRadKm = R_earth_km + moon_r_km * Math.tan(alphaPenumbra);
+
+  // Moon must be in anti-Sun direction
+  var lunarEclipseType = 'none';
+  var lunarEclipseAmt  = 0;
+  var antiSunDir = sunDir.clone().negate();
+  var dotAntiSun = antiSunDir.dot(moonDir);
+  if (dotAntiSun > 0.985) { // Moon roughly opposite Sun
+    // Angular separation of Moon from anti-Sun direction
+    var lunarSep = Math.acos(Math.max(-1,Math.min(1,dotAntiSun))) * moon_r_km; // km at Moon dist
+    var moonRadKm = MOON.R_mean;
+    if (lunarSep - moonRadKm < umbraRadKm) {
+      // Total lunar eclipse (Moon fully in umbra)
+      if (lunarSep + moonRadKm < umbraRadKm) {
+        lunarEclipseType = 'total';
+        lunarEclipseAmt = 1.0;
+      } else {
+        lunarEclipseType = 'partial';
+        lunarEclipseAmt = (umbraRadKm - (lunarSep - moonRadKm)) / (2*moonRadKm);
+      }
+    } else if (lunarSep - moonRadKm < penumbraRadKm) {
+      lunarEclipseType = 'penumbral';
+      lunarEclipseAmt = Math.min(1, (penumbraRadKm - (lunarSep - moonRadKm)) / (2*moonRadKm));
+    }
+  }
+
+  // ── UPDATE SHADOW CONES (visual) ──────────────────────────────────────
+  // Earth umbra cone: points away from Sun, centred on Earth
+  var earthWorldPos = new THREE.Vector3(ex, 0, ez);
+  var antiSunWorld  = new THREE.Vector3(-ex, 0, -ez).normalize();
+  // Cone length = distance at which umbra radius → 0 = R_earth / tan(alphaUmbra) ≈ 1.38M km
+  var umbraLenKm    = R_earth_km / Math.tan(alphaUmbra);
+  var umbraLen_sc   = (umbraLenKm / AU_KM) * AU_SC * 2.5; // scene units, scaled for visibility
+  var umbraBaseR_sc = EARTH_R * 1.1;
+
+  // Position cone: base at Earth, tip pointing away from Sun
+  umbraCone.geometry.dispose();
+  umbraCone.geometry = new THREE.ConeGeometry(umbraBaseR_sc, umbraLen_sc, 32, 1, true);
+  umbraCone.position.copy(earthWorldPos).addScaledVector(antiSunWorld, umbraLen_sc*0.5);
+  umbraCone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), antiSunWorld);
+  umbraMat.opacity = 0.35 + (lunarEclipseAmt * 0.3);
+  umbraCone.visible = true;
+
+  // Penumbra cone (wider)
+  var penumbraLen_sc = umbraLen_sc * 1.5;
+  var penumbraBaseR_sc = EARTH_R * 2.5;
+  penumbraCone.geometry.dispose();
+  penumbraCone.geometry = new THREE.ConeGeometry(penumbraBaseR_sc, penumbraLen_sc, 32, 1, true);
+  penumbraCone.position.copy(earthWorldPos).addScaledVector(antiSunWorld, penumbraLen_sc*0.5);
+  penumbraCone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), antiSunWorld);
+  penumbraMat.opacity = 0.12;
+  penumbraCone.visible = true;
+
+  // ── MOON PHASE APPEARANCE ─────────────────────────────────────────────
+  // The sun PointLight at origin already shades Moon correctly via Phong.
+  // Additional: during lunar eclipse, tint Moon blood-red (Rayleigh scattering approx)
+  if (lunarEclipseType === 'total') {
+    moonMat.emissive.setRGB(0.18 * lunarEclipseAmt, 0.03 * lunarEclipseAmt, 0.0);
+    moonMat.color.setRGB(0.5, 0.15, 0.05);
+  } else if (lunarEclipseType === 'partial') {
+    moonMat.emissive.setRGB(0.08 * lunarEclipseAmt, 0.02 * lunarEclipseAmt, 0.0);
+    moonMat.color.setRGB(0.6 + 0.07*(1-lunarEclipseAmt), 0.6 - 0.3*lunarEclipseAmt, 0.6 - 0.3*lunarEclipseAmt);
+  } else if (lunarEclipseType === 'penumbral') {
+    moonMat.emissive.setRGB(0, 0, 0);
+    moonMat.color.setRGB(0.55 - 0.1*lunarEclipseAmt, 0.55 - 0.1*lunarEclipseAmt, 0.6 - 0.08*lunarEclipseAmt);
+  } else {
+    moonMat.emissive.setRGB(0, 0, 0);
+    moonMat.color.setRGB(0.667, 0.667, 0.8);
+  }
+
+  // Earthshine: faint blue-white glow on new moon dark side
+  // Strongest at new moon (elongation ≈ 0), zero at full moon
+  var earthshineStr = Math.max(0, Math.cos(elongRad)) * 0.18;
+  earthshineLight.position.copy(earthWorldPos);
+  earthshineLight.intensity = earthshineStr;
+
+  // Solar eclipse: dim sun for Earth observers (visual only — darken sunMesh)
+  if (solarEclipseType !== 'none') {
+    sunLight.intensity = 3.0 * (1.0 - solarEclipseAmt * 0.95);
+  } else {
+    sunLight.intensity = 3.0;
+  }
+
+  // Eclipse status string
+  var eclipseStatus = 'None';
+  if (solarEclipseType !== 'none') {
+    eclipseStatus = 'SOLAR: ' + solarEclipseType.toUpperCase() + ' (' + (solarEclipseAmt*100).toFixed(0) + '%)';
+  } else if (lunarEclipseType !== 'none') {
+    eclipseStatus = 'LUNAR: ' + lunarEclipseType.toUpperCase() + ' (' + (lunarEclipseAmt*100).toFixed(0) + '%)';
+  }
+
+  // ── GR LIGHT DEFLECTION (Einstein 1915 / Eddington 1919) ─────────────────
+  // δα = 4GM☉/(c²·R☉) × (R☉_angular/θ) = GR_LIMB_RAD × sunAngR/θ
+  // For each catalog star, compute deflection and find the closest to Sun.
+  // During solar eclipse: stars near Sun are visible — show deflection values.
+  var grDeflEl = document.getElementById('hGRDefl');
+  var earthPosVec = new THREE.Vector3(ex, 0, ez);
+  // Sun direction from Earth (unit vec in scene coords)
+  var sunDirFromEarth = new THREE.Vector3(-ex, 0, -ez).normalize();
+  var closestStarAngle = Math.PI, closestDeflAS = 0, closestStarName = '';
+  for (var si = 0; si < STARS.length; si++) {
+    var slam = STARS[si][0]*DEG, sbet = STARS[si][1]*DEG;
+    // Star direction unit vector (ecliptic → scene)
+    var starVec = new THREE.Vector3(
+      Math.cos(sbet)*Math.cos(slam),
+      Math.sin(sbet),
+      -Math.cos(sbet)*Math.sin(slam)
+    );
+    // Angular separation from Sun center as seen from Earth
+    var angSep = Math.acos(Math.max(-1, Math.min(1, starVec.dot(sunDirFromEarth))));
+    if (angSep < closestStarAngle) {
+      closestStarAngle = angSep;
+      // δα = GR_LIMB_RAD × sunAngR / angSep   (radians)
+      closestDeflAS = (angSep > 0) ? (GR_LIMB_RAD * sunAngR / angSep) / AS2R : 0;
+      closestStarName = STARS[si][3];
+    }
+  }
+  // GR deflection at Sun's limb (always computed from exact formula)
+  var deflAtLimb_as = GR_LIMB_RAD / AS2R; // 1.752 arcsec
+  if (solarEclipseType === 'total' || solarEclipseType === 'annular') {
+    // During solar eclipse: show GR deflection for closest star
+    var closestSepArcmin = (closestStarAngle/DEG*60).toFixed(1);
+    grDeflEl.style.display = 'block';
+    grDeflEl.textContent = '★ Einstein deflection: '
+      + deflAtLimb_as.toFixed(4) + '″ at limb'
+      + (closestStarAngle < 10*DEG
+          ? ' · ' + closestStarName + ' (' + closestSepArcmin + '′): δα=' + closestDeflAS.toFixed(3) + '″'
+          : '');
+  } else {
+    grDeflEl.style.display = 'none';
+  }
+
+  // Moon orbit group
+  moonOrbitGroup.position.set(ex, 0, ez);
+  var moonOmega_J2000 = moonOmega - psiRad;  // tropical Ω → J2000 inertial
+  var qNode = new THREE.Quaternion().setFromAxisAngle(_up, moonOmega_J2000);
+  var nodeAxis = new THREE.Vector3(Math.cos(moonOmega_J2000), 0, -Math.sin(moonOmega_J2000));
+  var qIncl = new THREE.Quaternion().setFromAxisAngle(nodeAxis, MOON.i);
+  moonOrbitGroup.quaternion.copy(qNode).multiply(qIncl);
+
+  // Earth-Moon line
+  emLine.geometry.setFromPoints([earthGroup.position.clone(), moonMesh.position.clone()]);
+  emLine.geometry.computeBoundingSphere();
+
+  // ── Angular diameters ─────────────────────────────────────────────────
+  var sunAngDiam_as  = sunAngR  * 2 / DEG * 3600;
+  var moonAngDiam_as = moonAngR * 2 / DEG * 3600;
+
+  // Moon elongation / phase
+  // True magnitude from 3D geometry (includes all ELP corrections): 0° = new, 180° = full
+  var moonElong_deg = elongRad / DEG;
+  // Phase from cycle counting (D_cycle_rad already computed in MOON section above)
+  var D_cycle = ((D_cycle_rad / DEG) % 360 + 360) % 360;
+  // 0–180 = waxing, 180–360 = waning
+  var moonElong_signed = D_cycle <= 180 ? moonElong_deg : 360 - moonElong_deg;
+  var moonAge_days = D_cycle / 360 * MOON.Tsyn;
+
+  // ── Ecliptic longitude of Sun as seen from Earth ──────────────────────
+  // Sun's tropical geocentric ecliptic longitude — cycle-counted from VE2026 anchor
+  // VE2026 = Mar 20, 2026 14:46 UTC = state.days 9575.115 (λ☉=0°)
+  // T_trop = 365.2421875 d — same pattern as synodic/anomalistic cycle-counting
+  var lambdaSun_deg = (((state.days - 9575.115) / EARTH.Ty * 360) % 360 + 360) % 360;
+
+  // Precession
+  var psiDeg   = (psiRad/DEG % 360 + 360) % 360;
+  var epsDeg   = epsRad / DEG;
+  var raShift  = ((-psiDeg)%360+360)%360;
+  var raH      = Math.floor(raShift/15);
+  var raM_val  = Math.round((raShift/15-raH)*60); if(raM_val===60){raM_val=0;raH=(raH+1)%24;}
+
+  var julYear = 2000 + T_yr;
+  var jd      = J2000_JD + state.days;
+
+  // ── UPDATE HUD ────────────────────────────────────────────────────────
+  document.getElementById('dateBar').textContent = formatLocalTime(jd);
+  document.getElementById('hDate').textContent = formatDate(jd);
+  var calYr = jdToGregorian(jd);
+  document.getElementById('hYr').textContent   = calYr.year <= 0 ? (1 - calYr.year) + ' BCE' : calYr.year + ' CE';
+  document.getElementById('hLon').textContent  = lambdaSun_deg.toFixed(3)+'°';
+  document.getElementById('hJD').textContent   = jd.toFixed(2);
+  document.getElementById('hDays').textContent = state.days.toFixed(1)+' d';
+  document.getElementById('hR').textContent    = r_AU.toFixed(6)+' AU';
+  document.getElementById('hMR').textContent   = Math.round(moon_r_km).toLocaleString()+' km';
+  document.getElementById('hMoonAng').textContent = (moonAngR * 2 / DEG * 60).toFixed(2) + "'"; // arcmin
+  var moonMdeg = moonM / DEG;
+  var apexEl = document.getElementById('hMoonApex');
+  if (moonMdeg < 10 || moonMdeg > 350) {
+    apexEl.textContent = 'PERIGEE'; apexEl.style.color = '#ff9944';
+  } else if (moonMdeg > 170 && moonMdeg < 190) {
+    apexEl.textContent = 'APOGEE';  apexEl.style.color = '#44aaff';
+  } else {
+    apexEl.textContent = '';
+  }
+  document.getElementById('hNode').textContent = ((((moonOmega/DEG)%360)+360)%360).toFixed(2)+'°';
+  document.getElementById('hApse').textContent = ((((moonOmegaSmall/DEG)%360)+360)%360).toFixed(2)+'°';
+  // Synodic month count — Aryabhata calibration
+  // First new moon of KY: JD 588464.816 → NM_KALI = −1863080.184  (44527.75 at VE 499)
+  // KY epoch start:       JD 588464.25  → KY_EPOCH = −1863080.75   (1314931.25 d at VE 499)
+  var NM_KALI  = -1863080.184;
+  var KY_EPOCH = -1863080.75;
+  var nmRaw    = (state.days - NM_KALI) / MOON.Tsyn;
+  var nmSign   = nmRaw >= 0 ? '+' : '-';
+  var nmAbs    = Math.abs(nmRaw);
+  var nmFrac   = (nmAbs % 1).toFixed(2).slice(1);
+  document.getElementById('hFMCount').textContent = nmSign + Math.floor(nmAbs).toLocaleString() + nmFrac;
+  // KY elapsed days and weeks
+  var kyDays   = state.days - KY_EPOCH;
+  var kyWks    = Math.floor(Math.abs(kyDays) / 7);
+  var kyRemD   = Math.abs(kyDays) % 7;
+  var kySign   = kyDays >= 0 ? '' : '-';
+  document.getElementById('hKYDays').textContent  =
+    kySign + Math.abs(kyDays).toFixed(2) + ' d  (' + kySign + kyWks.toLocaleString() + 'w ' + kyRemD.toFixed(2) + 'd)';
+
+  // Season badge: show eclipse if active, else normal season
+  if (eclipseStatus !== 'None') {
+    document.getElementById('sBadge').textContent = '⚠ ' + eclipseStatus;
+    document.getElementById('sBadge').style.color = solarEclipseType !== 'none' ? '#ffcc00' : '#ff6644';
+  } else {
+    document.getElementById('sBadge').textContent = getSeason(lambdaSun_deg);
+    document.getElementById('sBadge').style.color = '#88ff88';
+  }
+
+  // ── UPDATE RIGHT PANEL ────────────────────────────────────────────────
+  document.getElementById('epsNow').textContent   = epsDeg.toFixed(4)+'°';
+  document.getElementById('psiNow').textContent   = psiDeg.toFixed(3)+'°';
+  document.getElementById('veNow').textContent    = raH+'h '+(raM_val<10?'0':'')+raM_val+'m';
+  document.getElementById('poleStar').textContent = nearestStar(T_yr);
+  document.getElementById('esDist').textContent   = Math.round(r_KM).toLocaleString()+' km';
+  document.getElementById('sunAngDiam').textContent = (sunAngDiam_as/3600).toFixed(4)+'° = '+sunAngDiam_as.toFixed(0)+'"';
+  document.getElementById('emDist').textContent   = Math.round(moon_r_km).toLocaleString()+' km';
+  document.getElementById('moonAngDiam').textContent = (moonAngDiam_as/3600).toFixed(4)+'° = '+moonAngDiam_as.toFixed(0)+'"';
+  document.getElementById('moonPhase').textContent= moonPhase(moonElong_signed);
+  document.getElementById('moonAge').textContent  = moonAge_days.toFixed(2)+' d';
+
+  // ── BENGALURU LOCAL SKY VIEW ─────────────────────────────────────────
+  if (bangaloreMode) {
+    // Local Sidereal Time at Bengaluru
+    var gast = GAST_J2000 + EARTH_ROT_RATE * state.days;
+    var lst  = gast + BLR_LON;
+
+    // Observer unit vector in Earth's equatorial frame
+    var obs_eq = new THREE.Vector3(
+      Math.cos(BLR_LAT) * Math.cos(lst),
+      Math.sin(BLR_LAT),
+      Math.cos(BLR_LAT) * Math.sin(lst)
+    );
+    // Rotate equatorial → world (ecliptic) frame via Earth's tilt quaternion
+    var obsWorldDir = obs_eq.clone().applyQuaternion(earthGroup.quaternion);
+
+    // Camera at observer's surface — Earth sphere naturally occludes below horizon
+    var blrSurfPos = earthGroup.position.clone().addScaledVector(obsWorldDir, EARTH_R * 1.02);
+    camera.position.copy(blrSurfPos);
+
+    // ── True altitude above local horizon ─────────────────────────────
+    // sin(alt) = unit_direction · zenith (obsWorldDir)
+    var sunDirFromObs  = new THREE.Vector3().subVectors(new THREE.Vector3(0,0,0), blrSurfPos).normalize();
+    var sinSunAlt      = sunDirFromObs.dot(obsWorldDir);
+    var sunAltDeg      = Math.asin(Math.max(-1, Math.min(1, sinSunAlt))) / DEG;
+
+    var moonPos        = moonMesh.position.clone();
+    var moonDirFromObs = moonPos.clone().sub(blrSurfPos).normalize();
+    var sinMoonAlt     = moonDirFromObs.dot(obsWorldDir);
+    var moonAltDeg     = Math.asin(Math.max(-1, Math.min(1, sinMoonAlt))) / DEG;
+
+    // ── Local horizontal coordinate frame ─────────────────────────────
+    // North: NCP direction projected onto horizontal plane
+    var ncpDot   = ncpDir.dot(obsWorldDir);
+    var blrNorth = ncpDir.clone().sub(obsWorldDir.clone().multiplyScalar(ncpDot));
+    if (blrNorth.length() < 0.01) {
+      // Fallback near poles
+      var arb = new THREE.Vector3(0, 0, 1);
+      blrNorth = arb.clone().sub(obsWorldDir.clone().multiplyScalar(arb.dot(obsWorldDir)));
+    }
+    blrNorth.normalize();
+    var blrEast = new THREE.Vector3().crossVectors(obsWorldDir, blrNorth).normalize();
+
+    // ── Camera orientation — user-controlled gaze ─────────────────────
+    // Up = local North so sky is oriented correctly (N at top of screen)
+    camera.up.copy(blrNorth);
+
+    // Convert user gaze (azimuth, elevation) → world-space look direction
+    var cosEl = Math.cos(blrLookEl), sinEl = Math.sin(blrLookEl);
+    var blrLookDir = blrEast.clone().multiplyScalar(cosEl * Math.sin(blrLookAz))
+      .addScaledVector(blrNorth, cosEl * Math.cos(blrLookAz))
+      .addScaledVector(obsWorldDir, sinEl);
+    camera.lookAt(blrSurfPos.clone().add(blrLookDir));
+
+    // ── Sky colour by Sun altitude (night / twilight / day) ───────────
+    if (sunAltDeg > 6) {
+      var sf = Math.min(1, (sunAltDeg - 6) / 40);
+      renderer.setClearColor(new THREE.Color((15 + sf*10)/255, (50 + sf*110)/255, (110 + sf*110)/255));
+    } else if (sunAltDeg > -18) {
+      var sf2 = (sunAltDeg + 18) / 24;
+      renderer.setClearColor(new THREE.Color((sf2*70)/255, (sf2*28)/255, (sf2*90)/255));
+    } else {
+      renderer.setClearColor(0x000006);
+    }
+
+    // ── Azimuth (N=0°, E=90°, S=180°, W=270°) ────────────────────────
+    var sunHoriz  = sunDirFromObs.clone().sub(obsWorldDir.clone().multiplyScalar(sinSunAlt));
+    var sunAzDeg  = ((Math.atan2(sunHoriz.dot(blrEast), sunHoriz.dot(blrNorth)) / DEG) % 360 + 360) % 360;
+    var moonHoriz = moonDirFromObs.clone().sub(obsWorldDir.clone().multiplyScalar(sinMoonAlt));
+    var moonAzDeg = ((Math.atan2(moonHoriz.dot(blrEast), moonHoriz.dot(blrNorth)) / DEG) % 360 + 360) % 360;
+
+    // ── Update overlay ────────────────────────────────────────────────
+    var illumPct = (1 - Math.cos(moonElong_signed * DEG)) / 2 * 100;
+    document.getElementById('blrDate').textContent     = formatLocalTime(jd) + '  (' + formatDate(jd) + ')';
+    document.getElementById('blrSunAlt').textContent   = sunAltDeg.toFixed(1)  + '° / ' + sunAzDeg.toFixed(0)  + '°';
+    document.getElementById('blrMoonAlt').textContent  = moonAltDeg.toFixed(1) + '° / ' + moonAzDeg.toFixed(0) + '°';
+    document.getElementById('blrPhase').textContent    = moonPhase(moonElong_signed);
+    document.getElementById('blrIllum').textContent    = illumPct.toFixed(1) + '%';
+    document.getElementById('blrAge').textContent      = moonAge_days.toFixed(2) + ' d';
+    document.getElementById('blrDist').textContent     = Math.round(moon_r_km).toLocaleString() + ' km';
+    document.getElementById('blrAngDiam').textContent  = (moonAngDiam_as/3600).toFixed(4) + '° (' + moonAngDiam_as.toFixed(0) + '")';
+
+    var blrEclEl = document.getElementById('blrEclipse');
+    if (eclipseStatus !== 'None') {
+      blrEclEl.textContent = '⚠ ' + eclipseStatus;
+      blrEclEl.style.display = 'inline';
+    } else {
+      blrEclEl.style.display = 'none';
+    }
+
+    drawPhaseDisc(moonElong_signed, moon_r_km);
+    document.getElementById('phaseLabel').textContent = moonPhase(moonElong_signed).toUpperCase();
+    drawMonthStrip(moonElong_signed, moonAge_days);
+
+  } else {
+    camera.up.set(0, 1, 0);
+  }
+
+  renderer.render(scene, camera);
+}
+
+requestAnimationFrame(animate);
+
+// ── Guided Tour ────────────────────────────────────────────────────────────
+(function() {
+  var steps = [
+    {
+      title: 'Full Moon — 2 May 2026',
+      date: { y:2026, m:5, d:2, frac:0 },
+      targets: ['#sBadge', '#hMR'],
+      desc: 'Badge confirms LUNAR PARTIAL 77%. Look at the 3D scene: Moon is on the far side of Earth from the Sun — that alignment puts it inside Earth\'s shadow. Geometry and HUD are in sync.'
+    },
+    {
+      title: 'Perihelion + Perigee — 3 Jan 2026',
+      date: { y:2026, m:1, d:3, frac:0 },
+      targets: ['#hR', '#hMR'],
+      desc: 'Earth at 0.984 AU — at the narrow end of its ellipse nearest the Sun. Moon r also at 356,400 km minimum. Two orbital extremes coincide: Earth fastest, Moon closest.'
+    },
+    {
+      title: 'Summer Solstice — 21 Jun 2026',
+      date: { y:2026, m:6, d:21, frac:0 },
+      targets: ['#sBadge', '#hLon'],
+      desc: 'λ☉ = 90°. Watch the scene: Earth\'s spin axis (blue rod) is tilted toward the Sun. Northern Hemisphere gets maximum sunlight — verify the geometry matches the badge.'
+    },
+    {
+      title: 'Supermoon Perigee — 14 Nov 2016',
+      date: { y:2016, m:11, d:14, frac:0 },
+      targets: ['#hMR', '#hMoonApex'],
+      desc: 'PERIGEE badge active. Moon r ≈ 356,400 km — orbital minimum. In the scene, Moon sits tight against Earth. Angular diameter 14% larger than at apogee. ELP calibration anchor.'
+    },
+    {
+      title: 'Einstein Eclipse — 29 May 1919',
+      date: { y:1919, m:5, d:29, frac:0.54 },
+      targets: ['#hMercGR'],
+      desc: 'Look at the scene: Moon is between Earth and Sun. Eddington photographed stars near the eclipsed Sun at this geometry, confirming GR. Mercury\'s 43″/cy perihelion precession predicted by Einstein 1915.'
+    },
+    {
+      title: 'Axial Precession — 1 Jul 13000 CE',
+      date: { y:13000, m:7, d:1, frac:0 },
+      targets: ['#poleStar', '#hYr'],
+      desc: 'Half a Platonic year (~12,900 yr). Pole star: Polaris → Vega. Watch the scene: Earth\'s axis now points in a completely different direction. Summer solstice has swapped to perihelion side.'
+    }
+  ];
+
+  var cur = 0;
+  var active = false;
+  var glowing = [];
+
+  function clearGlow() {
+    glowing.forEach(function(el) { el.classList.remove('tour-glow'); });
+    glowing = [];
+  }
+
+  function jumpTo(d) {
+    document.getElementById('gotoYear').value  = d.y;
+    document.getElementById('gotoMonth').value = d.m;
+    document.getElementById('gotoDay').value   = d.d;
+    applyGotoDate();
+    if (d.frac) state.days += d.frac;
+  }
+
+  function positionCallout(targets) {
+    var callout = document.getElementById('tourCallout');
+    var arrow   = document.getElementById('tourArrow');
+    var el = null;
+    for (var i = 0; i < targets.length; i++) {
+      el = document.querySelector(targets[i]);
+      if (el) break;
+    }
+    if (!el) return;
+    var r   = el.getBoundingClientRect();
+    var wh  = window.innerHeight;
+    var ww  = window.innerWidth;
+    var cw  = 240;
+    // Place callout above element if in bottom half
+    if (r.top > wh * 0.55) {
+      callout.style.top    = '';
+      callout.style.bottom = (wh - r.top + 12) + 'px';
+      arrow.style.top    = ''; arrow.style.bottom = '-7px';
+      arrow.style.borderTop    = '7px solid #e8b84b';
+      arrow.style.borderBottom = 'none';
+    } else {
+      callout.style.bottom = '';
+      callout.style.top    = (r.bottom + 12) + 'px';
+      arrow.style.bottom = ''; arrow.style.top = '-7px';
+      arrow.style.borderBottom = '7px solid #e8b84b';
+      arrow.style.borderTop    = 'none';
+    }
+    var left = r.left + r.width / 2 - cw / 2;
+    left = Math.max(8, Math.min(left, ww - cw - 8));
+    callout.style.left  = left + 'px';
+    callout.style.right = '';
+    var arrowLeft = (r.left + r.width / 2) - left - 7;
+    arrowLeft = Math.max(8, Math.min(arrowLeft, cw - 22));
+    arrow.style.left = arrowLeft + 'px';
+  }
+
+  function showStep(n) {
+    var s = steps[n];
+    clearGlow();
+    s.targets.forEach(function(sel) {
+      var el = document.querySelector(sel);
+      if (el) { el.classList.add('tour-glow'); glowing.push(el); }
+    });
+    jumpTo(s.date);
+    document.querySelector('.tc-title').textContent = s.title;
+    document.querySelector('.tc-desc').textContent  = s.desc;
+    document.getElementById('tourNavStep').textContent = (n + 1) + ' / ' + steps.length;
+    document.getElementById('tourNavNext').textContent = (n === steps.length - 1) ? 'Done ✓' : 'Next →';
+    setTimeout(function() { positionCallout(s.targets); }, 150);
+  }
+
+  function endTour() {
+    active = false;
+    clearGlow();
+    document.getElementById('tourCallout').style.display = 'none';
+    document.getElementById('tourNav').style.display     = 'none';
+    document.getElementById('tourBtn').textContent = '🔭 Tour';
+    document.getElementById('tourBtn').className   = '';
+    // Resume
+    state.running = true;
+    document.getElementById('playBtn').className  = 'on';
+    document.getElementById('stopBtn').className  = '';
+  }
+
+  function startTour() {
+    active = true; cur = 0;
+    // Pause simulation so jumps are stable
+    state.running = false;
+    document.getElementById('stopBtn').className  = 'on';
+    document.getElementById('playBtn').className  = '';
+    document.getElementById('tourCallout').style.display = 'block';
+    document.getElementById('tourNav').style.display     = 'flex';
+    document.getElementById('tourBtn').textContent = '✕ Tour';
+    document.getElementById('tourBtn').className   = 'on';
+    showStep(0);
+  }
+
+  document.getElementById('tourNavNext').addEventListener('click', function() {
+    if (cur >= steps.length - 1) { endTour(); return; }
+    cur++; showStep(cur);
+  });
+  document.getElementById('tourNavEnd').addEventListener('click', endTour);
+  document.getElementById('tourBtn').addEventListener('click', function() {
+    if (active) endTour(); else startTour();
+  });
+})();
+
+
+// ── PWA Service Worker registration ───────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(err) {
+      console.log('SW registration failed:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
