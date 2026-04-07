@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <!-- Apple touch icon (inline SVG → data URI) -->
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23000'/%3E%3Ccircle cx='256' cy='256' r='180' fill='none' stroke='%23c9a84c' stroke-width='6' stroke-dasharray='12 8'/%3E%3Ccircle cx='256' cy='256' r='28' fill='%23ffe060'/%3E%3Ccircle cx='406' cy='256' r='18' fill='%232255cc'/%3E%3Ccircle cx='340' cy='148' r='8' fill='%23ccccdd'/%3E%3Cline x1='256' y1='60' x2='256' y2='452' stroke='%234488ff' stroke-width='4' stroke-dasharray='8 6'/%3E%3C/svg%3E">
-<title>Earth–Sun–Moon: Precise 3D · v29</title>
+<title>Earth–Sun–Moon: Precise 3D · v30</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { width:100%; height:100%; background:#000; overflow:hidden; }
@@ -176,7 +176,7 @@ button.on { background:rgba(201,168,76,0.16); border-color:#e8b84b; color:#ffd06
 <div id="ui">
 
   <div id="top">
-    <span id="title">Earth · Sun · Moon — Precise 3D Dynamics &nbsp;<span style="color:#3a5080;font-size:10px;">v29</span></span>
+    <span id="title">Earth · Sun · Moon — Precise 3D Dynamics &nbsp;<span style="color:#3a5080;font-size:10px;">v30</span></span>
     <button id="playBtn" class="on">&#9654;</button>
     <button id="stopBtn">&#9646;&#9646;</button>
     <button id="rstBtn">&#8635;</button>
@@ -2214,6 +2214,12 @@ requestAnimationFrame(animate);
       date: { y:13000, m:7, d:1, frac:0 },
       targets: ['#poleStar', '#hYr'],
       desc: 'Half a Platonic year (~12,900 yr). Pole star: Polaris → Vega. Watch the scene: Earth\'s axis now points in a completely different direction. Summer solstice has swapped to perihelion side.'
+    },
+    {
+      title: '366.2421875 Sidereal Days — One Tropical Year',
+      date: { y:2001, m:3, d:20, frac:0 },
+      targets: ['#hDate', '#hR'],
+      desc: 'Exactly 365.2421875 solar days (= 46751/128) after VE 2000, Earth is back at the same orbital position. But it has rotated 366.2421875 times (= 46879/128) relative to the stars — one extra rotation from its own orbit around the Sun. 366 − 365 = 1 sidereal day gained per year.'
     }
   ];
 
